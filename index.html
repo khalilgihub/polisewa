@@ -69,6 +69,12 @@
             console.error("kuchingBoundary variable is not defined.");
         }
 
+        // 4. Pinpoint White House Polytechnic and center the map on it
+        var whiteHouseLatLng = [1.612563, 110.208187];
+        var whiteHouseMarker = L.marker(whiteHouseLatLng).addTo(map);
+        whiteHouseMarker.bindPopup("<b>White House Polytechnic</b><br>Matang, Kuching").openPopup();
+        map.setView(whiteHouseLatLng, 15);
+
         var currentMarker = null;
 
         // 3. Geocoding Search Function
