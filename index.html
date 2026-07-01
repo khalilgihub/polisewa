@@ -74,6 +74,11 @@
         var whiteHouseMarker = L.marker(whiteHouseLatLng).addTo(map);
         whiteHouseMarker.bindPopup("<b>White House Polytechnic</b><br>Matang, Kuching");
 
+        // Zoom in when clicking White House Polytechnic
+        whiteHouseMarker.on('click', function(e) {
+            map.setView(e.latlng, 16);
+        });
+
         // 5. Special Pinpoint: Politeknik Kuching Sarawak (Normal Marker with graduation cap icon)
         var polytechnicLatLng = [1.630688, 110.193062];
         var polytechIcon = L.divIcon({
@@ -85,6 +90,11 @@
         });
         var polytechMarker = L.marker(polytechnicLatLng, { icon: polytechIcon }).addTo(map);
         polytechMarker.bindPopup("<b>Politeknik Kuching Sarawak (PKS)</b><br>Batu 8, Jalan Matang");
+
+        // Zoom in when clicking Politeknik Kuching
+        polytechMarker.on('click', function(e) {
+            map.setView(e.latlng, 16);
+        });
 
         var currentMarker = null;
 
@@ -134,6 +144,11 @@
                             currentMarker = L.marker([lat, lon]).addTo(map);
                             var nameOnly = item.display_name.split(',')[0];
                             currentMarker.bindPopup("<b>" + nameOnly + "</b><br>" + item.display_name).openPopup();
+
+                            // Zoom in when clicking the search marker
+                            currentMarker.on('click', function(e) {
+                                map.setView(e.latlng, 16);
+                            });
 
                             // Clear search input text and close dropdown
                             resultsContainer.style.display = 'none';
