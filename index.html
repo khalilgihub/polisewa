@@ -74,6 +74,18 @@
         var whiteHouseMarker = L.marker(whiteHouseLatLng).addTo(map);
         whiteHouseMarker.bindPopup("<b>White House Polytechnic</b><br>Matang, Kuching");
 
+        // 5. Special Pinpoint: Politeknik Kuching Sarawak (Pulsing Marker with graduation cap icon)
+        var polytechnicLatLng = [1.630688, 110.193062];
+        var polytechIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: '<div class="pulse-ring"></div><div class="marker-pin"></div><span>🎓</span>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 30],
+            popupAnchor: [0, -30]
+        });
+        var polytechMarker = L.marker(polytechnicLatLng, { icon: polytechIcon }).addTo(map);
+        polytechMarker.bindPopup("<b>Politeknik Kuching Sarawak (PKS)</b><br>Batu 8, Jalan Matang");
+
         var currentMarker = null;
 
         // 3. Geocoding Search Function
