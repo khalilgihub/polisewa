@@ -4,6 +4,18 @@ Polisewa is a lightweight web application designed for students looking for room
 
 ---
 
+## 📚 Key Concepts Explained
+
+If you are new to web development, here is a quick guide to the technologies used in this project:
+
+*   **Node.js**: The core runtime engine that allows us to run JavaScript code directly on our computer/server (instead of only running it inside a web browser). It is what executes our backend file, `server.js`.
+*   **npm (Node Package Manager)**: A tool that acts like an "app store" for coding libraries. We use it to download and install helper packages (like `express` for the server, `bcryptjs` for security, and `sqlite3` for the database) using commands like `npm install`.
+*   **SQLite**: A lightweight, serverless database. Instead of requiring a massive database installation that runs as a separate background service, SQLite stores all your tables, columns, and registered users inside a single local file (`database.sqlite`) in your project folder.
+*   **Cloudflare Tunnels (`cloudflared`)**: A network utility that builds a secure, private "bridge" from a local computer (like your VMware VM) to the public internet. This allows users from other countries to visit your local website without you needing to do dangerous router configurations (Port Forwarding) or exposing your home IP address.
+*   **Git & GitHub**: Git is a version control tool that tracks changes in your code files. GitHub is a cloud storage platform. We use them together to easily push code from your host laptop and pull it into your VMware VM (`git pull origin main`).
+
+---
+
 ## 📂 Project Structure
 
 ```text
