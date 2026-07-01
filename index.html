@@ -323,26 +323,69 @@
         function handleAuthSubmit(event, type) {
             event.preventDefault();
             
-            var name = "";
-            var email = "";
-            
+            var payload = {};
+            var url = "";
+
             if (type === 'signin') {
-                email = document.getElementById("signin-email").value;
+                payload = {
+                    email: document.getElementById("signin-email").value.trim(),
+                    password: document.getElementById("signin-password").value
+                };
+                url = "/api/signin";
             } else {
-                name = document.getElementById("signup-name").value;
-                email = document.getElementById("signup-email").value;
+                payload = {
+                    name: document.getElementById("signup-name").value.trim(),
+                    email: document.getElementById("signup-email").value.trim(),
+                    phone: document.getElementById("signup-phone").value.trim(),
+                    password: document.getElementById("signup-password").value,
+                    role: activeRole,
+                    extra: document.getElementById("signup-extra").value.trim()
+                };
+                url = "/api/signup";
             }
 
-            var roleName = activeRole === 'student' ? 'Student' : 'Landlord';
-            var successMessage = type === 'signin' 
-                ? "Welcome back! Logged in successfully as " + roleName + " (" + email + ")."
-                : "Account created successfully for " + (name || email) + " as " + roleName + "!";
-            
-            alert(successMessage);
-            closeAuthModal();
+            // Visual loading state on the submit button
+            var submitBtn = event.target.querySelector(".submit-btn");
+            var originalText = submitBtn.innerText;
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Please wait...";
 
-            // Clear inputs
-            event.target.reset();
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(function(response) {
+                return response.json().then(function(data) {
+                    if (!response.ok) {
+                        throw new Error(data.error || "An error occurred.");
+                    }
+                    return data;
+                });
+            })
+            .then(function(data) {
+                alert(data.message);
+                closeAuthModal();
+                event.target.reset();
+                
+                // If sign-in is successful, update the header auth button
+                if (type === 'signin' && data.user) {
+                    var roleIcon = data.user.role === 'student' ? '🎓' : '🔑';
+                    authBtn.innerHTML = `
+                        <span style="font-size: 14px;">${roleIcon}</span>
+                        <span>Hello, ${data.user.name.split(' ')[0]}</span>
+                    `;
+                }
+            })
+            .catch(function(error) {
+                alert("Error: " + error.message);
+            })
+            .finally(function() {
+                submitBtn.disabled = false;
+                submitBtn.innerText = originalText;
+            });
         }
     </script>
 </body>

@@ -3,4 +3,6 @@
 .vscode/
 .idea/
 Thumbs.db
-Desktop.ini
+node_modules/
+database.sqlite
+package-lock.json
