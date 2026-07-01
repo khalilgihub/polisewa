@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Polisewa Map Search</title>
+    <!-- Google Fonts for modern typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- Boundary GeoJSON Data -->
+    <script src="boundary.js"></script>
+
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    
+    <div id="map-wrapper">
+        <!-- Floating Search Box -->
+        <div id="search-box">
+            <div class="search-input-wrapper">
+                <input type="text" id="search-input" placeholder="Search places (e.g. Kuching Waterfront)" />
+                <button id="search-button">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </button>
+            </div>
+            <!-- Dynamic dropdown results -->
+            <div id="search-results"></div>
+        </div>
+
+        <!-- The Map -->
+        <div id="map"></div>
+    </div>
+
+    <script>
+        // 1. Initialize Leaflet Map centered on Kuching
+        var map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false
+        }).setView([1.5535, 110.3593], 13);
+
+        // 2. Add Base Map Tiles
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+
+        // 3. Draw the Kuching boundary from the boundary.js file (bypasses browser CORS blocks on local file:// files)
+        if (typeof kuchingBoundary !== 'undefined') {
+            L.geoJSON(kuchingBoundary, {
+                style: {
+                    color: '#ff6600',    // Orange color
+                    dashArray: '8, 8',   // Dotted line style
+                    weight: 3.5,
+                    fillOpacity: 0       // Transparent fill (outline only)
+                },
+                interactive: false       // Let clicks pass through to the map
+            }).addTo(map);
+        } else {
+            console.error("kuchingBoundary variable is not defined.");
+        }
+
+        var currentMarker = null;
+
+        // 3. Geocoding Search Function
+        function performSearch() {
+            var query = document.getElementById("search-input").value.trim();
+            if (!query) return;
+
+            var resultsContainer = document.getElementById("search-results");
+            resultsContainer.innerHTML = '<div style="padding: 12px 16px; color: #64748b; font-size: 14px;">Searching...</div>';
+            resultsContainer.style.display = 'block';
+
+            // Query OpenStreetMap Nominatim Free Search API
+            var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&limit=5';
+
+            fetch(url)
+                .then(function(response) {
+                    return response.json();
+                })
+                .then(function(data) {
+                    resultsContainer.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        resultsContainer.innerHTML = '<div style="padding: 12px 16px; color: #ef4444; font-size: 14px;">No locations found. Try being more specific.</div>';
+                        return;
+                    }
+
+                    // Loop through results and build dropdown list
+                    data.forEach(function(item) {
+                        var div = document.createElement('div');
+                        div.className = 'result-item';
+                        div.innerText = item.display_name;
+                        
+                        div.onclick = function() {
+                            var lat = parseFloat(item.lat);
+                            var lon = parseFloat(item.lon);
+                            
+                            // Zoom & center map on result coordinates
+                            map.setView([lat, lon], 16);
+
+                            // Remove old search marker
+                            if (currentMarker) {
+                                map.removeLayer(currentMarker);
+                            }
+
+                            // Place new marker with popup
+                            currentMarker = L.marker([lat, lon]).addTo(map);
+                            var nameOnly = item.display_name.split(',')[0];
+                            currentMarker.bindPopup("<b>" + nameOnly + "</b><br>" + item.display_name).openPopup();
+
+                            // Clear search input text and close dropdown
+                            resultsContainer.style.display = 'none';
+                            document.getElementById("search-input").value = nameOnly;
+                        };
+                        resultsContainer.appendChild(div);
+                    });
+                })
+                .catch(function(error) {
+                    console.error('Search error:', error);
+                    resultsContainer.innerHTML = '<div style="padding: 12px 16px; color: #ef4444; font-size: 14px;">Error fetching search results.</div>';
+                });
+        }
+
+        // Attach Event Listeners
+        document.getElementById("search-button").onclick = performSearch;
+
+        // Trigger search on Enter key
+        document.getElementById("search-input").onkeydown = function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        };
+
+        // Close dropdown when clicking outside search box
+        document.addEventListener('click', function(e) {
+            var searchBox = document.getElementById("search-box");
+            var resultsContainer = document.getElementById("search-results");
+            if (!searchBox.contains(e.target)) {
+                resultsContainer.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
