@@ -132,7 +132,45 @@ To make the application server running on your VM accessible via `polisewa.me`:
 
 ---
 
-## 8. Step 7: View and Manage User Data
+## 8. Understanding the Connection Flow & `server.js`
+
+For your online database to work, **`server.js` must be running 24/7**. If you close your terminal or stop the node process, your database connection goes offline, and visitors won't be able to register or sign in.
+
+Here is how the data flow connects everything:
+
+```
+[ User Browser ]  =====>  [ polisewa.me ]  =====>  [ Node.js Server (server.js) ]  =====>  [ Azure SQL Database ]
+(Types credentials)       (Cloudflare Tunnel)          (Listens on Port 3000)          (polisewa.database.windows.net)
+```
+
+1. **Frontend to Domain**: A user visits `polisewa.me`, fills in the signup form, and hits "Submit". The browser fires a web request (`/api/signup`).
+2. **Domain to Backend**: Cloudflare routes this request through the tunnel to `localhost:3000` inside your VM, where `server.js` is listening.
+3. **Backend to Azure DB**: `server.js` takes the input, hashes the password, connects securely to `polisewa.database.windows.net` using the password in your `.env` file, runs the INSERT query, and sends the confirmation back to the user.
+
+---
+
+## 9. Running `server.js` in the Background (24/7)
+
+By default, running `npm start` occupies your terminal. If you close the terminal window, the server shuts down. To run `server.js` permanently in the background:
+
+### Option A: Use PM2 (Recommended Process Manager)
+1. Install PM2 globally on your VM:
+   ```cmd
+   npm install pm2 -g
+   ```
+2. Start the server using PM2 instead of npm start:
+   ```cmd
+   pm2 start server.js --name "polisewa"
+   ```
+3. To monitor, check status, or restart:
+   - **Check running status**: `pm2 status`
+   - **Restart server**: `pm2 restart polisewa`
+   - **Stop server**: `pm2 stop polisewa`
+   - **View logs**: `pm2 logs`
+
+---
+
+## 10. Step 7: View and Manage User Data
 You can inspect the database content from the cloud without hosting anything locally:
 
 1. Open the Azure Portal and click on your SQL Database `polisewa`.
@@ -143,3 +181,4 @@ You can inspect the database content from the cloud without hosting anything loc
    SELECT * FROM users;
    ```
 5. You will see a table at the bottom displaying all registered user accounts.
+
