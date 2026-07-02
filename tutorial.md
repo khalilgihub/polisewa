@@ -182,3 +182,52 @@ You can inspect the database content from the cloud without hosting anything loc
    ```
 5. You will see a table at the bottom displaying all registered user accounts.
 
+---
+
+## 11. What is inside `server.js`? (The Backend Code)
+
+The `server.js` file is the brain of your backend. It handles all the database connections and processes the signup/signin requests. For the Azure SQL integration to work, `server.js` requires a few specific elements:
+
+### 1. Dependencies (NPM Packages)
+It imports essential libraries to function:
+- `mssql`: Microsoft's official driver for connecting to Azure SQL Database.
+- `dotenv`: Loads your passwords securely from the `.env` file so they aren't hardcoded in the script.
+- `bcryptjs`: Encrypts (hashes) user passwords before saving them to the database.
+- `express` & `cors`: Sets up the web server to handle HTTP POST requests from your front-end (`index.html`).
+
+### 2. Azure Connection Pool
+Instead of opening a new connection for every user, it creates a **Connection Pool** upon startup.
+```javascript
+const dbConfig = {
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    server: process.env.DB_SERVER,
+    database: process.env.DB_DATABASE,
+    options: {
+        encrypt: true, // Mandatory for Azure SQL
+        trustServerCertificate: false
+    }
+};
+const poolPromise = new sql.ConnectionPool(dbConfig).connect();
+```
+*Note: `encrypt: true` is strictly required for Azure databases to securely encrypt traffic.*
+
+### 3. T-SQL Queries (Azure SQL Syntax)
+Azure SQL uses **T-SQL** (Transact-SQL), which is different from your old SQLite setup. 
+- **Auto-incrementing IDs**: Instead of SQLite's `AUTOINCREMENT`, Azure SQL uses `IDENTITY(1,1)`.
+- **String Types**: Instead of `TEXT`, Azure SQL uses `NVARCHAR(255)`.
+- **Insert Queries**: When inserting a user, we use `OUTPUT INSERTED.id` to retrieve the newly generated user ID.
+
+### 4. Parameterized Inputs (Security)
+To prevent SQL Injection hackers, the code never pastes user input directly into a query. It explicitly defines SQL parameters:
+```javascript
+await pool.request()
+    .input('email', sql.NVarChar, email)
+    .query('SELECT * FROM users WHERE email = @email');
+```
+
+### 5. Network Listener
+At the very bottom, it listens on `0.0.0.0` rather than just `localhost`. This allows it to accept traffic routed from your Cloudflare Tunnel to the VM's internal network card:
+```javascript
+app.listen(PORT, '0.0.0.0', () => { ... });
+```
