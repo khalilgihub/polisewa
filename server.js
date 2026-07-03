@@ -89,13 +89,22 @@ app.post('/api/signup', async (req, res) => {
                 VALUES (@name, @email, @phone, @password, @role, @extra)
             `);
 
+        const newUserId = result.recordset[0].id;
+
         res.status(201).json({ 
             message: 'Account created successfully!', 
-            userId: result.recordset[0].id
+            userId: newUserId,
+            user: {
+                id: newUserId,
+                name: name,
+                email: emailLower,
+                phone: phone,
+                role: role,
+                extra: extra || ''
+            }
         });
     } catch (err) {
         console.error('Signup error:', err);
-        // Error numbers 2627 and 2601 represent unique/duplicate key constraint violations in SQL Server
         if (err.number === 2627 || err.number === 2601 || err.message.includes('unique') || err.message.includes('duplicate')) {
             return res.status(409).json({ error: 'An account with this email address already exists.' });
         }
@@ -141,14 +150,13 @@ app.post('/api/signin', async (req, res) => {
     }
 });
 
-
 // Fallback to serve index.html for undefined frontend routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Start listening on all network interfaces (important for VMware networking)
+// Start listening on all network interfaces
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Polisewa local server running on port ${PORT}`);
+    console.log(`Polisewa server running on port ${PORT}`);
     console.log(`To access from other machines/VMs, use: http://<YOUR_IP_ADDRESS>:${PORT}`);
 });

@@ -153,15 +153,7 @@
             console.error("kuchingBoundary variable is not defined.");
         }
 
-        // 4. Pinpoint White House Polytechnic quietly on the map
-        var whiteHouseLatLng = [1.612563, 110.208187];
-        var whiteHouseMarker = L.marker(whiteHouseLatLng).addTo(map);
-        whiteHouseMarker.bindPopup("<b>White House Polytechnic</b><br>Matang, Kuching");
 
-        // Zoom in when clicking White House Polytechnic
-        whiteHouseMarker.on('click', function (e) {
-            map.setView(e.latlng, 16);
-        });
 
         // 5. Special Pinpoint: Politeknik Kuching Sarawak (Normal Marker with graduation cap icon)
         var polytechnicLatLng = [1.630688, 110.193062];
@@ -181,6 +173,36 @@
         });
 
         var currentMarker = null;
+        var currentUser = null;
+        var landlordMarkers = [];
+
+        // Landlord click to add marker
+        map.on('click', function(e) {
+            if (currentUser && currentUser.role === 'landlord') {
+                if (landlordMarkers.length >= 2) {
+                    alert("You can only add up to 2 pinpoints.");
+                    return;
+                }
+                
+                var customName = prompt("Enter a name for this rental/property:");
+                if (customName && customName.trim() !== "") {
+                    var newMarker = L.marker(e.latlng).addTo(map);
+                    
+                    // Create popup with remove button
+                    var popupContent = document.createElement('div');
+                    popupContent.innerHTML = "<b>" + customName + "</b><br><button class='remove-pin-btn' style='margin-top:8px; padding:4px 8px; font-size:12px; cursor:pointer; background:#ef4444; color:white; border:none; border-radius:4px;'>Remove Pin</button>";
+                    
+                    var removeBtn = popupContent.querySelector('.remove-pin-btn');
+                    removeBtn.onclick = function() {
+                        map.removeLayer(newMarker);
+                        landlordMarkers = landlordMarkers.filter(function(m) { return m !== newMarker; });
+                    };
+                    
+                    newMarker.bindPopup(popupContent).openPopup();
+                    landlordMarkers.push(newMarker);
+                }
+            }
+        });
 
         // 3. Geocoding Search Function
         function performSearch() {
@@ -375,8 +397,9 @@
                     closeAuthModal();
                     event.target.reset();
 
-                    // If sign-in is successful, update the header auth button
-                    if (type === 'signin' && data.user) {
+                    // Update the header auth button for both sign-in and sign-up
+                    if (data.user) {
+                        currentUser = data.user;
                         var roleIcon = data.user.role === 'student' ? '🎓' : '🔑';
                         authBtn.innerHTML = `
                         <span style="font-size: 14px;">${roleIcon}</span>
