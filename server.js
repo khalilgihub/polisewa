@@ -12,6 +12,12 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Set custom header to identify which VM served the request
+app.use((req, res, next) => {
+    res.setHeader('X-Served-By', process.env.VM_NAME || 'Unknown-VM');
+    next();
+});
+
 // Serve static frontend files from the root directory
 app.use(express.static(__dirname));
 
