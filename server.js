@@ -38,7 +38,7 @@ const poolPromise = new sql.ConnectionPool(dbConfig)
     .connect()
     .then(pool => {
         console.log('Connected to Azure SQL Database at:', process.env.DB_SERVER);
-        createTable(pool);
+        createTables(pool);
         return pool;
     })
     .catch(err => {
@@ -46,10 +46,12 @@ const poolPromise = new sql.ConnectionPool(dbConfig)
         process.exit(1);
     });
 
-// Create users table if it doesn't exist (T-SQL syntax)
-async function createTable(pool) {
+// Create database tables if they don't exist (T-SQL syntax)
+async function createTables(pool) {
     try {
         const request = pool.request();
+        
+        // Create users table
         await request.query(`
             IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
             CREATE TABLE users (
@@ -63,8 +65,24 @@ async function createTable(pool) {
             )
         `);
         console.log('Users table initialized successfully.');
+
+        // Create properties table
+        await request.query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='properties' AND xtype='U')
+            CREATE TABLE properties (
+                id INT IDENTITY(1,1) PRIMARY KEY,
+                user_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE CASCADE,
+                name NVARCHAR(255) NOT NULL,
+                [desc] NVARCHAR(MAX),
+                price NVARCHAR(100),
+                phone NVARCHAR(50),
+                lat FLOAT NOT NULL,
+                lng FLOAT NOT NULL
+            )
+        `);
+        console.log('Properties table initialized successfully.');
     } catch (err) {
-        console.error('Error creating users table:', err.message);
+        console.error('Error initializing tables:', err.message);
     }
 }
 
@@ -152,6 +170,133 @@ app.post('/api/signin', async (req, res) => {
         });
     } catch (err) {
         console.error('Signin error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// --- PROPERTIES ENDPOINTS ---
+
+// 1. GET ALL PROPERTIES
+app.get('/api/properties', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT 
+                p.id, 
+                p.user_id, 
+                p.name, 
+                p.[desc], 
+                p.price, 
+                p.phone, 
+                p.lat, 
+                p.lng, 
+                u.name AS landlord_name
+            FROM properties p
+            JOIN users u ON p.user_id = u.id
+        `);
+        res.status(200).json(result.recordset);
+    } catch (err) {
+        console.error('Fetch properties error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// 2. CREATE A PROPERTY
+app.post('/api/properties', async (req, res) => {
+    const { user_id, name, desc, price, phone, lat, lng } = req.body;
+
+    if (!user_id || !name || lat === undefined || lng === undefined) {
+        return res.status(400).json({ error: 'User ID, name, lat, and lng are required.' });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('user_id', sql.Int, user_id)
+            .input('name', sql.NVarChar, name)
+            .input('desc', sql.NVarChar, desc || '')
+            .input('price', sql.NVarChar, price || '')
+            .input('phone', sql.NVarChar, phone || '')
+            .input('lat', sql.Float, lat)
+            .input('lng', sql.Float, lng)
+            .query(`
+                INSERT INTO properties (user_id, name, [desc], price, phone, lat, lng)
+                OUTPUT INSERTED.id
+                VALUES (@user_id, @name, @desc, @price, @phone, @lat, @lng)
+            `);
+
+        const newPropertyId = result.recordset[0].id;
+        res.status(201).json({
+            message: 'Property created successfully!',
+            id: newPropertyId
+        });
+    } catch (err) {
+        console.error('Create property error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// 3. UPDATE A PROPERTY
+app.put('/api/properties/:id', async (req, res) => {
+    const propertyId = req.params.id;
+    const { user_id, name, desc, price, phone } = req.body;
+
+    if (!user_id || !name) {
+        return res.status(400).json({ error: 'User ID and name are required.' });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('id', sql.Int, propertyId)
+            .input('user_id', sql.Int, user_id)
+            .input('name', sql.NVarChar, name)
+            .input('desc', sql.NVarChar, desc || '')
+            .input('price', sql.NVarChar, price || '')
+            .input('phone', sql.NVarChar, phone || '')
+            .query(`
+                UPDATE properties
+                SET name = @name, [desc] = @desc, price = @price, phone = @phone
+                WHERE id = @id AND user_id = @user_id
+            `);
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ error: 'Property not found or user is not authorized to edit it.' });
+        }
+
+        res.status(200).json({ message: 'Property updated successfully!' });
+    } catch (err) {
+        console.error('Update property error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// 4. DELETE A PROPERTY
+app.delete('/api/properties/:id', async (req, res) => {
+    const propertyId = req.params.id;
+    const { user_id } = req.body;
+
+    if (!user_id) {
+        return res.status(400).json({ error: 'User ID is required.' });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('id', sql.Int, propertyId)
+            .input('user_id', sql.Int, user_id)
+            .query(`
+                DELETE FROM properties
+                WHERE id = @id AND user_id = @user_id
+            `);
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ error: 'Property not found or user is not authorized to delete it.' });
+        }
+
+        res.status(200).json({ message: 'Property deleted successfully!' });
+    } catch (err) {
+        console.error('Delete property error:', err);
         res.status(500).json({ error: 'Database error: ' + err.message });
     }
 });
