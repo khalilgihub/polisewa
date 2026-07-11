@@ -1,0 +1,131 @@
+[33mcommit 8c8b050ffe12543263eda606164095ab2e4b61d5[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Fri Jul 3 10:02:41 2026 +0800
+
+    Azure SQL backend
+
+[33mcommit 48ea1b95b5d329e8cc87fe4a05e4bbabbb473c94[m[33m ([m[1;31morigin/main[m[33m)[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Fri Jul 3 10:01:13 2026 +0800
+
+    Switch backend back to Azure SQL Database
+
+[33mcommit 4937e3bea2b2ad31d0ace900c97d125fa3a04db9[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Thu Jul 2 19:14:41 2026 +0800
+
+    Explain server.js functionality inside tutorial.md
+
+[33mcommit 316bf568c4dbd3d872ac68af6c3b4e7494a0641f[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Thu Jul 2 19:11:25 2026 +0800
+
+    Update tutorial.md with server.js lifecycle, PM2 deployment, and connection flow details
+
+[33mcommit bc6aaea91528f961c5d937a8a70b7753ee2bd86a[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Thu Jul 2 19:04:40 2026 +0800
+
+    Add A to Z deployment tutorial.md
+
+[33mcommit 894743cbfb715897d7452f093fca739c6cfcdfab[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Thu Jul 2 18:58:44 2026 +0800
+
+    Add readmeonline.md for Azure SQL deployment configuration
+
+[33mcommit dfdf0424cc925b5462f7e5df589e84c25205f4de[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Thu Jul 2 18:40:18 2026 +0800
+
+    Migrate database connection to Azure SQL Database
+
+[33mcommit 06810635d59cd981afd4d7acebb3c4681f72f592[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 23:40:51 2026 +0800
+
+    Update README.md with Key Concepts section defining Node.js, npm, SQLite, Cloudflare, and Git
+
+[33mcommit 8dd35c2005223db7c71d40430dc793779b1a6259[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 22:55:48 2026 +0800
+
+    Enhance fetch error handling to catch non-JSON responses when server is offline
+
+[33mcommit 0fbde8e21abd9efd7057f09c38d8d53caf1e9dd5[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 22:33:08 2026 +0800
+
+    Create project README.md documenting structure, database architecture, and deployment tutorials
+
+[33mcommit 69f517df19be585a522acab7544d43c0d428cf94[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 22:28:15 2026 +0800
+
+    Make view_db.py script interactive to support deleting users by ID
+
+[33mcommit b6f02d866166d475b4bfaebe3e59f2fc0bf098ca[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 21:12:15 2026 +0800
+
+    Add view_db.py script to easily view SQLite database contents via python
+
+[33mcommit fbe668f608365fd8ec8f67c9fa71842f183bf1ae[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 19:58:36 2026 +0800
+
+    Implement Node.js Express server with SQLite3 database for student/landlord signup and signin
+
+[33mcommit 1bf8dafb1636fd34edb25cd6362d411366b7378e[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 19:54:24 2026 +0800
+
+    Add glassmorphic Login and SignUp form modal for students and landlords
+
+[33mcommit d6adfab3abd34050d0fb1ce8d3f281fc75686729[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 19:47:05 2026 +0800
+
+    Add zoom-in to marker on click
+
+[33mcommit eba7d91601bb35d6cbcb3d90539377732e7f6e9f[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 19:40:24 2026 +0800
+
+    Remove pulsing wave animation from Politeknik Kuching marker
+
+[33mcommit d7621fbadc4dbd37f2a1db4087083956b7bd6608[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 19:38:25 2026 +0800
+
+    Add special pulsing pinpoint for Politeknik Kuching Sarawak
+
+[33mcommit 46bd58a60e524f364518a1ee173d68494cf50695[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 19:33:39 2026 +0800
+
+    Disable auto-centering and auto-popup for White House Polytechnic on map load
+
+[33mcommit 47a9fe05c603c34092478763de687374c3db21ea[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 19:30:59 2026 +0800
+
+    Pinpoint White House Polytechnic on map load
+
+[33mcommit 6a39afe178d6dafae48aa4b268ec9d00e4621801[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 19:10:04 2026 +0800
+
+    Remove redundant kuching.geojson file
+
+[33mcommit 2cdc4340c51a754967f00e48dae51854ed593ef2[m
+Author: lil <githublil505@gmail.com>
+Date:   Wed Jul 1 19:01:26 2026 +0800
+
+    Create CNAME
+
+[33mcommit dd7d42ee37c16df417623bc3a14b57856952f7cc[m
+Author: liltest1 <liltest99991@gmail.com>
+Date:   Wed Jul 1 18:49:41 2026 +0800
+
+    Initial commit: Leaflet map with geocoding search and boundary
