@@ -1,9 +1,10 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const sql = require('mssql');
+const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,79 +13,96 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Set custom header to identify which VM served the request
-app.use((req, res, next) => {
-    res.setHeader('X-Served-By', process.env.VM_NAME || 'Unknown-VM');
-    next();
-});
-
 // Serve static frontend files from the root directory
 app.use(express.static(__dirname));
 
-// Database connection configuration
-const dbConfig = {
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    server: process.env.DB_SERVER,
-    database: process.env.DB_DATABASE,
-    options: {
-        encrypt: true, // Use encryption for Azure SQL
-        trustServerCertificate: false
-    }
-};
+// Ensure uploads directory exists and serve it as static files
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+app.use('/uploads', express.static(UPLOAD_DIR));
 
-// Initialize Azure SQL Connection Pool
-const poolPromise = new sql.ConnectionPool(dbConfig)
-    .connect()
-    .then(pool => {
-        console.log('Connected to Azure SQL Database at:', process.env.DB_SERVER);
-        createTables(pool);
-        return pool;
-    })
-    .catch(err => {
-        console.error('Database connection failed! Bad Config:', err.message);
-        process.exit(1);
+// Initialize SQLite database
+const dbPath = path.join(__dirname, 'database.sqlite');
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('Error connecting to database:', err.message);
+    } else {
+        console.log('Connected to SQLite database at:', dbPath);
+        createTable();
+    }
+});
+
+// Create users table if it doesn't exist
+function createTable() {
+    db.run(`
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            phone TEXT NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT CHECK(role IN ('student', 'landlord')) NOT NULL,
+            extra TEXT
+        )
+    `, (err) => {
+        if (err) {
+            console.error('Error creating users table:', err.message);
+        } else {
+            console.log('Users table initialized successfully.');
+        }
     });
 
-// Create database tables if they don't exist (T-SQL syntax)
-async function createTables(pool) {
-    try {
-        const request = pool.request();
-        
-        // Create users table
-        await request.query(`
-            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
-            CREATE TABLE users (
-                id INT IDENTITY(1,1) PRIMARY KEY,
-                name NVARCHAR(255) NOT NULL,
-                email NVARCHAR(255) UNIQUE NOT NULL,
-                phone NVARCHAR(50) NOT NULL,
-                password NVARCHAR(255) NOT NULL,
-                role NVARCHAR(50) CHECK(role IN ('student', 'landlord')) NOT NULL,
-                extra NVARCHAR(MAX)
-            )
-        `);
-        console.log('Users table initialized successfully.');
-
-        // Create properties table
-        await request.query(`
-            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='properties' AND xtype='U')
-            CREATE TABLE properties (
-                id INT IDENTITY(1,1) PRIMARY KEY,
-                user_id INT NOT NULL FOREIGN KEY REFERENCES users(id) ON DELETE CASCADE,
-                name NVARCHAR(255) NOT NULL,
-                [desc] NVARCHAR(MAX),
-                price NVARCHAR(100),
-                phone NVARCHAR(50),
-                lat FLOAT NOT NULL,
-                lng FLOAT NOT NULL
-            )
-        `);
-        console.log('Properties table initialized successfully.');
-    } catch (err) {
-        console.error('Error initializing tables:', err.message);
-    }
+    db.run(`
+        CREATE TABLE IF NOT EXISTS properties (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            desc TEXT DEFAULT '',
+            price TEXT DEFAULT '',
+            phone TEXT DEFAULT '',
+            lat REAL NOT NULL,
+            lng REAL NOT NULL,
+            image TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    `, (err) => {
+        if (err) {
+            console.error('Error creating properties table:', err.message);
+        } else {
+            console.log('Properties table initialized successfully.');
+            // Add image column to pre-existing tables (safe migration)
+            db.run(`ALTER TABLE properties ADD COLUMN image TEXT DEFAULT ''`, (alterErr) => {
+                if (alterErr && !alterErr.message.includes('duplicate column')) {
+                    console.error('Error adding image column:', alterErr.message);
+                }
+            });
+        }
+    });
 }
+
+// Multer configuration for property image uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, UPLOAD_DIR);
+    },
+    filename: function (req, file, cb) {
+        const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+        cb(null, 'property-' + unique + ext);
+    }
+});
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: function (req, file, cb) {
+        const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else cb(new Error('Only JPG, PNG, GIF, and WebP images are allowed.'));
+    }
+});
 
 // SIGN UP Endpoint
 app.post('/api/signup', async (req, res) => {
@@ -95,210 +113,185 @@ app.post('/api/signup', async (req, res) => {
     }
 
     try {
-        const pool = await poolPromise;
+        // Hash the password securely using bcrypt
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        const emailLower = email.toLowerCase().trim();
 
-        const result = await pool.request()
-            .input('name', sql.NVarChar, name)
-            .input('email', sql.NVarChar, emailLower)
-            .input('phone', sql.NVarChar, phone)
-            .input('password', sql.NVarChar, hashedPassword)
-            .input('role', sql.NVarChar, role)
-            .input('extra', sql.NVarChar, extra || '')
-            .query(`
-                INSERT INTO users (name, email, phone, password, role, extra)
-                OUTPUT INSERTED.id
-                VALUES (@name, @email, @phone, @password, @role, @extra)
-            `);
+        const sql = `INSERT INTO users (name, email, phone, password, role, extra) VALUES (?, ?, ?, ?, ?, ?)`;
+        const params = [name, email.toLowerCase().trim(), phone, hashedPassword, role, extra || ''];
 
-        const newUserId = result.recordset[0].id;
-
-        res.status(201).json({ 
-            message: 'Account created successfully!', 
-            userId: newUserId,
-            user: {
-                id: newUserId,
-                name: name,
-                email: emailLower,
-                phone: phone,
-                role: role,
-                extra: extra || ''
+        db.run(sql, params, function(err) {
+            if (err) {
+                if (err.message.includes('UNIQUE constraint failed: users.email')) {
+                    return res.status(409).json({ error: 'An account with this email address already exists.' });
+                }
+                return res.status(500).json({ error: 'Database error: ' + err.message });
             }
+            // Return the user object so the client can persist it in localStorage
+            const newUserId = this.lastID;
+            db.get(`SELECT id, name, email, phone, role, extra FROM users WHERE id = ?`, [newUserId], (err2, user) => {
+                if (err2) return res.status(500).json({ error: 'Database error: ' + err2.message });
+                res.status(201).json({ 
+                    message: 'Account created successfully!', 
+                    user: user,
+                    userId: newUserId
+                });
+            });
         });
     } catch (err) {
         console.error('Signup error:', err);
-        if (err.number === 2627 || err.number === 2601 || err.message.includes('unique') || err.message.includes('duplicate')) {
-            return res.status(409).json({ error: 'An account with this email address already exists.' });
-        }
-        res.status(500).json({ error: 'Database error: ' + err.message });
+        res.status(500).json({ error: 'Server error occurred during sign up.' });
     }
 });
 
 // SIGN IN Endpoint
-app.post('/api/signin', async (req, res) => {
+app.post('/api/signin', (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required.' });
     }
 
-    try {
-        const pool = await poolPromise;
-        const emailLower = email.toLowerCase().trim();
-
-        const result = await pool.request()
-            .input('email', sql.NVarChar, emailLower)
-            .query('SELECT * FROM users WHERE email = @email');
-
-        const user = result.recordset[0];
+    const sql = `SELECT * FROM users WHERE email = ?`;
+    db.get(sql, [email.toLowerCase().trim()], async (err, user) => {
+        if (err) {
+            return res.status(500).json({ error: 'Database error: ' + err.message });
+        }
         if (!user) {
             return res.status(401).json({ error: 'Invalid email address or password.' });
         }
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ error: 'Invalid email address or password.' });
+        try {
+            // Compare hashed password
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) {
+                return res.status(401).json({ error: 'Invalid email address or password.' });
+            }
+
+            // Authentication success (omit password from returned object)
+            const { password: _, ...userData } = user;
+            res.status(200).json({ 
+                message: 'Logged in successfully!', 
+                user: userData 
+            });
+        } catch (err) {
+            console.error('Signin error:', err);
+            res.status(500).json({ error: 'Server error occurred during sign in.' });
         }
-
-        // Authentication success (omit password from returned object)
-        const { password: _, ...userData } = user;
-        res.status(200).json({ 
-            message: 'Logged in successfully!', 
-            user: userData 
-        });
-    } catch (err) {
-        console.error('Signin error:', err);
-        res.status(500).json({ error: 'Database error: ' + err.message });
-    }
+    });
 });
 
-// --- PROPERTIES ENDPOINTS ---
-
-// 1. GET ALL PROPERTIES
-app.get('/api/properties', async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request().query(`
-            SELECT 
-                p.id, 
-                p.user_id, 
-                p.name, 
-                p.[desc], 
-                p.price, 
-                p.phone, 
-                p.lat, 
-                p.lng, 
-                u.name AS landlord_name
-            FROM properties p
-            JOIN users u ON p.user_id = u.id
-        `);
-        res.status(200).json(result.recordset);
-    } catch (err) {
-        console.error('Fetch properties error:', err);
-        res.status(500).json({ error: 'Database error: ' + err.message });
-    }
+// GET all properties (visible to everyone)
+app.get('/api/properties', (req, res) => {
+    const sql = `SELECT properties.*, users.name as landlord_name FROM properties JOIN users ON properties.user_id = users.id`;
+    db.all(sql, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+        res.json(rows);
+    });
 });
 
-// 2. CREATE A PROPERTY
-app.post('/api/properties', async (req, res) => {
-    const { user_id, name, desc, price, phone, lat, lng } = req.body;
+// Upload a property image (landlord only). Returns the public URL of the saved image.
+app.post('/api/properties/upload-image', upload.single('image'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No image file provided.' });
+    res.status(201).json({
+        message: 'Image uploaded.',
+        imageUrl: '/uploads/' + req.file.filename
+    });
+});
 
+// POST create property (landlord only)
+app.post('/api/properties', (req, res) => {
+    const { user_id, name, desc, price, phone, lat, lng, image } = req.body;
     if (!user_id || !name || lat === undefined || lng === undefined) {
-        return res.status(400).json({ error: 'User ID, name, lat, and lng are required.' });
+        return res.status(400).json({ error: 'user_id, name, lat, and lng are required.' });
     }
 
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request()
-            .input('user_id', sql.Int, user_id)
-            .input('name', sql.NVarChar, name)
-            .input('desc', sql.NVarChar, desc || '')
-            .input('price', sql.NVarChar, price || '')
-            .input('phone', sql.NVarChar, phone || '')
-            .input('lat', sql.Float, lat)
-            .input('lng', sql.Float, lng)
-            .query(`
-                INSERT INTO properties (user_id, name, [desc], price, phone, lat, lng)
-                OUTPUT INSERTED.id
-                VALUES (@user_id, @name, @desc, @price, @phone, @lat, @lng)
-            `);
+    const countSql = `SELECT COUNT(*) as count FROM properties WHERE user_id = ?`;
+    db.get(countSql, [user_id], (err, row) => {
+        if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+        if (row.count >= 2) {
+            return res.status(400).json({ error: 'Maximum 2 properties allowed per landlord.' });
+        }
 
-        const newPropertyId = result.recordset[0].id;
-        res.status(201).json({
-            message: 'Property created successfully!',
-            id: newPropertyId
+        const sql = `INSERT INTO properties (user_id, name, desc, price, phone, lat, lng, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+        db.run(sql, [user_id, name, desc || '', price || '', phone || '', lat, lng, image || ''], function(err) {
+            if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+            res.status(201).json({ id: this.lastID, message: 'Property created.' });
         });
-    } catch (err) {
-        console.error('Create property error:', err);
-        res.status(500).json({ error: 'Database error: ' + err.message });
-    }
+    });
 });
 
-// 3. UPDATE A PROPERTY
-app.put('/api/properties/:id', async (req, res) => {
-    const propertyId = req.params.id;
-    const { user_id, name, desc, price, phone } = req.body;
-
+// PUT update property
+app.put('/api/properties/:id', (req, res) => {
+    const { id } = req.params;
+    const { user_id, name, desc, price, phone, image } = req.body;
     if (!user_id || !name) {
-        return res.status(400).json({ error: 'User ID and name are required.' });
+        return res.status(400).json({ error: 'user_id and name are required.' });
     }
 
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request()
-            .input('id', sql.Int, propertyId)
-            .input('user_id', sql.Int, user_id)
-            .input('name', sql.NVarChar, name)
-            .input('desc', sql.NVarChar, desc || '')
-            .input('price', sql.NVarChar, price || '')
-            .input('phone', sql.NVarChar, phone || '')
-            .query(`
-                UPDATE properties
-                SET name = @name, [desc] = @desc, price = @price, phone = @phone
-                WHERE id = @id AND user_id = @user_id
-            `);
-
-        if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({ error: 'Property not found or user is not authorized to edit it.' });
-        }
-
-        res.status(200).json({ message: 'Property updated successfully!' });
-    } catch (err) {
-        console.error('Update property error:', err);
-        res.status(500).json({ error: 'Database error: ' + err.message });
-    }
+    const sql = `UPDATE properties SET name = ?, desc = ?, price = ?, phone = ?, image = ? WHERE id = ? AND user_id = ?`;
+    db.run(sql, [name, desc || '', price || '', phone || '', image || '', id, user_id], function(err) {
+        if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+        if (this.changes === 0) return res.status(404).json({ error: 'Property not found or not owned by you.' });
+        res.json({ message: 'Property updated.' });
+    });
 });
 
-// 4. DELETE A PROPERTY
-app.delete('/api/properties/:id', async (req, res) => {
-    const propertyId = req.params.id;
+// DELETE property
+app.delete('/api/properties/:id', (req, res) => {
+    const { id } = req.params;
     const { user_id } = req.body;
+    if (!user_id) return res.status(400).json({ error: 'user_id is required.' });
 
-    if (!user_id) {
-        return res.status(400).json({ error: 'User ID is required.' });
-    }
+    const sql = `DELETE FROM properties WHERE id = ? AND user_id = ?`;
+    db.run(sql, [id, user_id], function(err) {
+        if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+        if (this.changes === 0) return res.status(404).json({ error: 'Property not found or not owned by you.' });
+        res.json({ message: 'Property deleted.' });
+    });
+});
 
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request()
-            .input('id', sql.Int, propertyId)
-            .input('user_id', sql.Int, user_id)
-            .query(`
-                DELETE FROM properties
-                WHERE id = @id AND user_id = @user_id
-            `);
+// DELETE user account (cascades to delete properties and their images)
+app.delete('/api/user', async (req, res) => {
+    const { user_id, password } = req.body;
+    if (!user_id || !password) return res.status(400).json({ error: 'user_id and password are required.' });
 
-        if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({ error: 'Property not found or user is not authorized to delete it.' });
+    const userSql = `SELECT * FROM users WHERE id = ?`;
+    db.get(userSql, [user_id], async (err, user) => {
+        if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+        if (!user) return res.status(404).json({ error: 'User not found.' });
+
+        try {
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) return res.status(401).json({ error: 'Incorrect password.' });
+        } catch (e) {
+            return res.status(500).json({ error: 'Server error.' });
         }
 
-        res.status(200).json({ message: 'Property deleted successfully!' });
-    } catch (err) {
-        console.error('Delete property error:', err);
-        res.status(500).json({ error: 'Database error: ' + err.message });
-    }
+        // Get all images to clean up from disk
+        const imgSql = `SELECT image FROM properties WHERE user_id = ?`;
+        db.all(imgSql, [user_id], (err, rows) => {
+            if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+
+            if (rows) {
+                rows.forEach(function(row) {
+                    if (row.image) {
+                        var filePath = path.join(UPLOAD_DIR, path.basename(row.image));
+                        try { fs.unlinkSync(filePath); } catch(e) { /* ignore missing files */ }
+                    }
+                });
+            }
+
+            db.run(`DELETE FROM properties WHERE user_id = ?`, [user_id], function(err) {
+                if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+
+                db.run(`DELETE FROM users WHERE id = ?`, [user_id], function(err) {
+                    if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+                    res.json({ message: 'Account and all associated data deleted permanently.' });
+                });
+            });
+        });
+    });
 });
 
 // Fallback to serve index.html for undefined frontend routes
@@ -306,8 +299,8 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Start listening on all network interfaces
+// Start listening on all network interfaces (important for VMware networking)
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Polisewa server running on port ${PORT}`);
+    console.log(`Polisewa local server running on port ${PORT}`);
     console.log(`To access from other machines/VMs, use: http://<YOUR_IP_ADDRESS>:${PORT}`);
 });
