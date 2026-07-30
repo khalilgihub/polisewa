@@ -50,6 +50,27 @@
             <span>Login / Sign Up</span>
         </button>
 
+        <!-- Auth Dropdown Menu (visible when logged in) -->
+        <div id="auth-dropdown" class="auth-dropdown">
+            <div class="auth-dropdown-header">Account</div>
+            <button class="auth-dropdown-item" onclick="handleLogout()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Log Out
+            </button>
+            <div class="auth-dropdown-divider"></div>
+            <button class="auth-dropdown-item auth-dropdown-danger" onclick="openDeleteAccountModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Delete Account
+            </button>
+        </div>
+
         <!-- Auth Modal Overlay -->
         <div id="auth-modal-overlay" class="modal-overlay">
             <div id="auth-modal" class="modal-card">
@@ -121,6 +142,31 @@
             </div>
         </div>
 
+        <!-- Delete Account Confirmation Modal -->
+        <div id="delete-modal-overlay" class="modal-overlay">
+            <div id="delete-modal" class="modal-card modal-card-sm">
+                <button class="close-btn" onclick="closeDeleteAccountModal()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                <div class="modal-header">
+                    <h2>Delete Account</h2>
+                    <p>This action is permanent and cannot be undone. All your properties will be removed.</p>
+                </div>
+                <div class="input-group">
+                    <label for="delete-password">Enter your password to confirm</label>
+                    <input type="password" id="delete-password" required placeholder="••••••••" />
+                </div>
+                <div class="modal-actions-row">
+                    <button type="button" class="submit-btn submit-btn-secondary" onclick="closeDeleteAccountModal()">Cancel</button>
+                    <button type="button" class="submit-btn submit-btn-danger" id="delete-confirm-btn" onclick="handleDeleteAccount()">Delete Forever</button>
+                </div>
+            </div>
+        </div>
+
         <!-- The Map -->
         <div id="map"></div>
     </div>
@@ -156,6 +202,29 @@
             <div class="input-group">
                 <label for="panel-phone">Phone</label>
                 <input type="tel" id="panel-phone" placeholder="+60123456789" />
+            </div>
+            <div class="input-group" id="panel-image-group">
+                <label>Property Photo</label>
+                <div class="panel-image-upload">
+                    <input type="file" id="panel-image-input" accept="image/*" hidden />
+                    <div class="panel-image-preview" id="panel-image-preview">
+                        <div class="panel-image-empty" id="panel-image-empty">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            <span>Click to add a photo of your place</span>
+                        </div>
+                        <img id="panel-image-img" alt="Property photo" style="display:none;" />
+                        <button type="button" class="panel-image-remove" id="panel-image-remove" title="Remove photo" style="display:none;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
             </div>
             <div id="panel-landlord-info" class="panel-landlord-info"></div>
             <div class="panel-actions" id="panel-actions-edit">
@@ -219,6 +288,8 @@
         var currentUser = null;
         var landlordMarkers = [];
         var editingMarkerIndex = -1;
+        var pendingImageUrl = '';   // image URL staged for the next property save
+        var panelImageFile = null;  // file chosen in the panel, awaiting upload
 
         function loadProperties() {
             fetch('/api/properties')
@@ -242,7 +313,8 @@
                             phone: prop.phone,
                             landlord_name: prop.landlord_name,
                             lat: prop.lat,
-                            lng: prop.lng
+                            lng: prop.lng,
+                            image: prop.image || ''
                         };
                         var index = landlordMarkers.length;
                         landlordMarkers.push(propertyData);
@@ -311,7 +383,13 @@
                 actionsHtml += "</div>";
             }
 
-            popupContent.innerHTML = "<b>" + data.name + "</b>" +
+            var imageHtml = '';
+            if (data.image) {
+                imageHtml = "<img class='popup-image-thumb' src='" + data.image + "' alt='Property photo' />";
+            }
+
+            popupContent.innerHTML = imageHtml +
+                "<b>" + data.name + "</b>" +
                 (data.desc ? "<br><small>" + data.desc + "</small>" : "") +
                 (data.price ? "<br><span style='color:#2563eb;font-weight:600;'>RM " + data.price + "/month</span>" : "") +
                 (data.phone ? "<br><small>📞 " + data.phone + "</small>" : "") +
@@ -373,6 +451,28 @@
             var actionsEdit = document.getElementById('panel-actions-edit');
             var actionsView = document.getElementById('panel-actions-view');
             var landlordInfo = document.getElementById('panel-landlord-info');
+            var imageGroup = document.getElementById('panel-image-group');
+            var imagePreview = document.getElementById('panel-image-preview');
+            var imageInput = document.getElementById('panel-image-input');
+            var imageImg = document.getElementById('panel-image-img');
+            var imageEmpty = document.getElementById('panel-image-empty');
+            var imageRemove = document.getElementById('panel-image-remove');
+
+            // Reset image state
+            panelImageFile = null;
+            pendingImageUrl = '';
+
+            var isLandlord = currentUser && currentUser.role === 'landlord';
+            // Upload UI is only shown for landlords when adding/editing their own property
+            if ((mode === 'create' || mode === 'edit') && isLandlord) {
+                imageGroup.style.display = 'flex';
+                imagePreview.classList.remove('disabled');
+                imageInput.disabled = false;
+            } else {
+                imageGroup.style.display = 'flex';
+                imagePreview.classList.add('disabled');
+                imageInput.disabled = true;
+            }
 
             if (mode === 'create') {
                 title.innerText = 'Add Property';
@@ -389,6 +489,7 @@
                 landlordInfo.style.display = 'none';
                 actionsEdit.style.display = 'flex';
                 actionsView.style.display = 'none';
+                setPanelImage('');
                 if (pendingLatLng) {
                     document.getElementById('panel-coords').innerText =
                         pendingLatLng.lat.toFixed(5) + ', ' + pendingLatLng.lng.toFixed(5);
@@ -410,6 +511,8 @@
                 landlordInfo.style.display = 'none';
                 actionsEdit.style.display = 'flex';
                 actionsView.style.display = 'none';
+                setPanelImage(data.image || '');
+                pendingImageUrl = data.image || '';
                 document.getElementById('panel-coords').innerText =
                     data.lat.toFixed(5) + ', ' + data.lng.toFixed(5);
             } else if (mode === 'view') {
@@ -435,6 +538,7 @@
                 landlordInfo.style.display = 'block';
                 actionsEdit.style.display = 'none';
                 actionsView.style.display = 'flex';
+                setPanelImage(data.image || '');
                 document.getElementById('panel-coords').innerText =
                     data.lat.toFixed(5) + ', ' + data.lng.toFixed(5);
             }
@@ -442,11 +546,36 @@
             panel.classList.add('active');
         }
 
+        // Render the image preview inside the panel (used by all panel modes)
+        function setPanelImage(url) {
+            var imageImg = document.getElementById('panel-image-img');
+            var imageEmpty = document.getElementById('panel-image-empty');
+            var imageRemove = document.getElementById('panel-image-remove');
+            var preview = document.getElementById('panel-image-preview');
+            if (url) {
+                imageImg.src = url;
+                imageImg.style.display = 'block';
+                imageEmpty.style.display = 'none';
+                // Only show remove button if landlord is allowed to edit
+                var isLandlord = currentUser && currentUser.role === 'landlord';
+                imageRemove.style.display = (isLandlord && !preview.classList.contains('disabled')) ? 'flex' : 'none';
+            } else {
+                imageImg.removeAttribute('src');
+                imageImg.style.display = 'none';
+                imageEmpty.style.display = 'flex';
+                imageRemove.style.display = 'none';
+            }
+        }
+
         function closePropertyPanel() {
             document.getElementById('property-panel').classList.remove('active');
             panelMode = '';
             editingMarkerIndex = -1;
             pendingLatLng = null;
+            pendingImageUrl = '';
+            panelImageFile = null;
+            var input = document.getElementById('panel-image-input');
+            if (input) input.value = '';
         }
 
         function savePropertyFromPanel(event) {
@@ -456,91 +585,190 @@
             var desc = document.getElementById('panel-desc').value.trim();
             var price = document.getElementById('panel-price').value.trim();
             var phone = document.getElementById('panel-phone').value.trim();
+            var saveBtn = document.getElementById('panel-save-btn');
+            var originalText = saveBtn.innerText;
+            saveBtn.disabled = true;
+            saveBtn.innerText = 'Saving...';
 
-            if (panelMode === 'create') {
-                fetch('/api/properties', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        user_id: currentUser.id,
-                        name: name,
-                        desc: desc,
-                        price: price,
-                        phone: phone,
-                        lat: pendingLatLng.lat,
-                        lng: pendingLatLng.lng
+            var proceed = function(finalImageUrl) {
+                pendingImageUrl = finalImageUrl;
+                if (panelMode === 'create') {
+                    fetch('/api/properties', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_id: currentUser.id,
+                            name: name,
+                            desc: desc,
+                            price: price,
+                            phone: phone,
+                            lat: pendingLatLng.lat,
+                            lng: pendingLatLng.lng,
+                            image: pendingImageUrl
+                        })
                     })
-                })
-                .then(function(res) { return res.json(); })
-                .then(function(result) {
-                    if (result.error) {
-                        alert(result.error);
+                    .then(function(res) { return res.json(); })
+                    .then(function(result) {
+                        if (result.error) {
+                            alert(result.error);
+                            saveBtn.disabled = false;
+                            saveBtn.innerText = originalText;
+                            return;
+                        }
+                        var newMarker = L.marker([pendingLatLng.lat, pendingLatLng.lng]).addTo(map);
+                        var propertyData = {
+                            id: result.id,
+                            user_id: currentUser.id,
+                            marker: newMarker,
+                            name: name,
+                            desc: desc,
+                            price: price,
+                            phone: phone,
+                            landlord_name: currentUser.name,
+                            lat: pendingLatLng.lat,
+                            lng: pendingLatLng.lng,
+                            image: pendingImageUrl
+                        };
+                        var index = landlordMarkers.length;
+                        landlordMarkers.push(propertyData);
+                        newMarker.bindPopup(createMarkerPopup(index));
+                        newMarker.on('click', (function(idx) {
+                            return function() {
+                                var data = landlordMarkers[idx];
+                                if (currentUser && currentUser.id === data.user_id) {
+                                    map.closePopup();
+                                    openPropertyPanel('edit', idx);
+                                } else {
+                                    map.closePopup();
+                                    openPropertyPanel('view', idx);
+                                }
+                            };
+                        })(index));
+                        newMarker.openPopup();
+                        saveBtn.disabled = false;
+                        saveBtn.innerText = originalText;
+                        closePropertyPanel();
+                    })
+                    .catch(function(err) {
+                        alert('Failed to create property: ' + err.message);
+                        saveBtn.disabled = false;
+                        saveBtn.innerText = originalText;
+                    });
+                } else if (panelMode === 'edit') {
+                    if (editingMarkerIndex < 0) {
+                        saveBtn.disabled = false;
+                        saveBtn.innerText = originalText;
                         return;
                     }
-                    var newMarker = L.marker([pendingLatLng.lat, pendingLatLng.lng]).addTo(map);
-                    var propertyData = {
-                        id: result.id,
-                        user_id: currentUser.id,
-                        marker: newMarker,
-                        name: name,
-                        desc: desc,
-                        price: price,
-                        phone: phone,
-                        landlord_name: currentUser.name,
-                        lat: pendingLatLng.lat,
-                        lng: pendingLatLng.lng
-                    };
-                    var index = landlordMarkers.length;
-                    landlordMarkers.push(propertyData);
-                    newMarker.bindPopup(createMarkerPopup(index));
-                    newMarker.on('click', (function(idx) {
-                        return function() {
-                            var data = landlordMarkers[idx];
-                            if (currentUser && currentUser.id === data.user_id) {
-                                map.closePopup();
-                                openPropertyPanel('edit', idx);
-                            } else {
-                                map.closePopup();
-                                openPropertyPanel('view', idx);
-                            }
-                        };
-                    })(index));
-                    newMarker.openPopup();
-                    closePropertyPanel();
-                })
-                .catch(function(err) {
-                    alert('Failed to create property: ' + err.message);
-                });
-            } else if (panelMode === 'edit') {
-                if (editingMarkerIndex < 0) return;
 
-                var data = landlordMarkers[editingMarkerIndex];
-                data.name = name;
-                data.desc = desc;
-                data.price = price;
-                data.phone = phone;
+                    var data = landlordMarkers[editingMarkerIndex];
+                    data.name = name;
+                    data.desc = desc;
+                    data.price = price;
+                    data.phone = phone;
+                    data.image = pendingImageUrl;
 
-                fetch('/api/properties/' + data.id, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        user_id: currentUser.id,
-                        name: name,
-                        desc: desc,
-                        price: price,
-                        phone: phone
+                    fetch('/api/properties/' + data.id, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_id: currentUser.id,
+                            name: name,
+                            desc: desc,
+                            price: price,
+                            phone: phone,
+                            image: pendingImageUrl
+                        })
                     })
+                    .then(function(res) { return res.json(); })
+                    .then(function() {
+                        refreshPopup(editingMarkerIndex);
+                        saveBtn.disabled = false;
+                        saveBtn.innerText = originalText;
+                        closePropertyPanel();
+                    })
+                    .catch(function(err) {
+                        alert('Failed to save property: ' + err.message);
+                        saveBtn.disabled = false;
+                        saveBtn.innerText = originalText;
+                    });
+                }
+            };
+
+            // If a new image file was selected, upload it first
+            if (panelImageFile) {
+                var formData = new FormData();
+                formData.append('image', panelImageFile);
+                fetch('/api/properties/upload-image', {
+                    method: 'POST',
+                    body: formData
                 })
                 .then(function(res) { return res.json(); })
-                .then(function() {
-                    refreshPopup(editingMarkerIndex);
-                    closePropertyPanel();
+                .then(function(uploadResult) {
+                    if (uploadResult.error) {
+                        alert('Image upload failed: ' + uploadResult.error);
+                        saveBtn.disabled = false;
+                        saveBtn.innerText = originalText;
+                        return;
+                    }
+                    proceed(uploadResult.imageUrl);
                 })
                 .catch(function(err) {
-                    alert('Failed to save property: ' + err.message);
+                    alert('Image upload failed: ' + err.message);
+                    saveBtn.disabled = false;
+                    saveBtn.innerText = originalText;
                 });
+            } else {
+                // Keep the existing image URL (may be empty)
+                proceed(pendingImageUrl);
             }
         }
+
+        // Image upload UI inside the property panel (landlord only)
+        (function setupPanelImageUpload() {
+            var preview = document.getElementById('panel-image-preview');
+            var input = document.getElementById('panel-image-input');
+            var removeBtn = document.getElementById('panel-image-remove');
+            var imageImg = document.getElementById('panel-image-img');
+            var imageEmpty = document.getElementById('panel-image-empty');
+
+            preview.addEventListener('click', function() {
+                if (preview.classList.contains('disabled')) return;
+                input.click();
+            });
+
+            input.addEventListener('change', function() {
+                var file = input.files && input.files[0];
+                if (!file) return;
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('Image must be smaller than 5MB.');
+                    input.value = '';
+                    return;
+                }
+                panelImageFile = file;
+                pendingImageUrl = ''; // uploaded URL will replace this
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    imageImg.src = e.target.result;
+                    imageImg.style.display = 'block';
+                    imageEmpty.style.display = 'none';
+                    removeBtn.style.display = 'flex';
+                };
+                reader.readAsDataURL(file);
+            });
+
+            removeBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (preview.classList.contains('disabled')) return;
+                panelImageFile = null;
+                pendingImageUrl = '';
+                input.value = '';
+                imageImg.removeAttribute('src');
+                imageImg.style.display = 'none';
+                imageEmpty.style.display = 'flex';
+                removeBtn.style.display = 'none';
+            });
+        })();
 
         // Landlord click to add marker
         map.on('click', function(e) {
@@ -644,12 +872,16 @@
             }
         };
 
-        // Close dropdown when clicking outside search box
+        // Close dropdown when clicking outside
         document.addEventListener('click', function (e) {
             var searchBox = document.getElementById("search-box");
             var resultsContainer = document.getElementById("search-results");
             if (!searchBox.contains(e.target)) {
                 resultsContainer.style.display = 'none';
+            }
+            // Close auth dropdown when clicking outside of it and the auth button
+            if (authDropdown && !authDropdown.contains(e.target) && e.target !== authBtn && !authBtn.contains(e.target)) {
+                authDropdown.classList.remove('active');
             }
         });
 
@@ -659,10 +891,116 @@
 
         var authBtn = document.getElementById("auth-btn");
         var authModalOverlay = document.getElementById("auth-modal-overlay");
+        var authDropdown = document.getElementById("auth-dropdown");
+        var deleteModalOverlay = document.getElementById("delete-modal-overlay");
+
+        // Restore user session from localStorage on page load
+        var savedSession = null;
+        try {
+            savedSession = JSON.parse(localStorage.getItem('polisewa_user') || 'null');
+        } catch(e) { savedSession = null; }
+        if (savedSession && savedSession.id) {
+            currentUser = savedSession;
+            updateAuthButton();
+        }
 
         authBtn.onclick = function () {
-            authModalOverlay.classList.add("active");
+            if (currentUser) {
+                // Toggle dropdown
+                var isActive = authDropdown.classList.contains('active');
+                if (isActive) {
+                    authDropdown.classList.remove('active');
+                } else {
+                    authDropdown.classList.add('active');
+                }
+            } else {
+                authModalOverlay.classList.add("active");
+            }
         };
+
+        function updateAuthButton() {
+            if (currentUser) {
+                var roleIcon = currentUser.role === 'student' ? '🎓' : '🔑';
+                authBtn.innerHTML = `
+                    <span style="font-size: 14px;">${roleIcon}</span>
+                    <span>Hello, ${currentUser.name.split(' ')[0]}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                `;
+            } else {
+                authBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <span>Login / Sign Up</span>
+                `;
+                authDropdown.classList.remove('active');
+            }
+        }
+
+        function handleLogout() {
+            if (!currentUser) return;
+            if (!confirm('Are you sure you want to log out?')) return;
+            currentUser = null;
+            localStorage.removeItem('polisewa_user');
+            authDropdown.classList.remove('active');
+            updateAuthButton();
+            loadProperties();
+        }
+
+        function openDeleteAccountModal() {
+            authDropdown.classList.remove('active');
+            document.getElementById('delete-password').value = '';
+            deleteModalOverlay.classList.add('active');
+        }
+
+        function closeDeleteAccountModal() {
+            deleteModalOverlay.classList.remove('active');
+        }
+
+        deleteModalOverlay.onclick = function(e) {
+            if (e.target === deleteModalOverlay) {
+                closeDeleteAccountModal();
+            }
+        };
+
+        function handleDeleteAccount() {
+            if (!currentUser) return;
+            var password = document.getElementById('delete-password').value;
+            if (!password) {
+                alert('Please enter your password to confirm account deletion.');
+                return;
+            }
+
+            var btn = document.getElementById('delete-confirm-btn');
+            var originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = 'Deleting...';
+
+            fetch('/api/user', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: currentUser.id, password: password })
+            })
+            .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
+            .then(function(data) {
+                alert(data.message);
+                currentUser = null;
+                localStorage.removeItem('polisewa_user');
+                deleteModalOverlay.classList.remove('active');
+                updateAuthButton();
+                loadProperties();
+            })
+            .catch(function(err) {
+                alert('Error: ' + err.message);
+            })
+            .finally(function() {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            });
+        }
 
         function closeAuthModal() {
             authModalOverlay.classList.remove("active");
@@ -762,14 +1100,11 @@
                     closeAuthModal();
                     event.target.reset();
 
-                    // Update the header auth button for both sign-in and sign-up
+                    // Save user session and update button
                     if (data.user) {
                         currentUser = data.user;
-                        var roleIcon = data.user.role === 'student' ? '🎓' : '🔑';
-                        authBtn.innerHTML = `
-                        <span style="font-size: 14px;">${roleIcon}</span>
-                        <span>Hello, ${data.user.name.split(' ')[0]}</span>
-                    `;
+                        localStorage.setItem('polisewa_user', JSON.stringify(data.user));
+                        updateAuthButton();
                         loadProperties();
                     }
                 })
