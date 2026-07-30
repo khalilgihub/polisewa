@@ -550,3 +550,203 @@ body, html {
     -webkit-text-fill-color: #334155;
 }
 
+/* Property photo upload (landlord only) */
+.panel-image-upload {
+    width: 100%;
+}
+
+.panel-image-preview {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    background: #f8fafc;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.panel-image-preview:hover {
+    border-color: #2563eb;
+    background: #f0f9ff;
+}
+
+.panel-image-preview.disabled {
+    cursor: default;
+    border-color: #e2e8f0;
+    background: #f8fafc;
+}
+
+.panel-image-preview.disabled:hover {
+    border-color: #e2e8f0;
+    background: #f8fafc;
+}
+
+.panel-image-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #94a3b8;
+    font-size: 13px;
+    text-align: center;
+    padding: 16px;
+}
+
+.panel-image-empty svg {
+    color: #cbd5e1;
+}
+
+#panel-image-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.panel-image-remove {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(15, 23, 42, 0.75);
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #ffffff;
+    transition: background-color 0.2s;
+    z-index: 2;
+}
+
+.panel-image-remove:hover {
+    background: #ef4444;
+}
+
+/* Image preview thumbnail inside the property popup on the map */
+.popup-image-thumb {
+    width: 100%;
+    max-height: 140px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+/* Auth Dropdown Menu */
+.auth-dropdown {
+    position: absolute;
+    top: 60px;
+    left: 20px;
+    z-index: 1001;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+    min-width: 200px;
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+    padding: 6px;
+}
+
+.auth-dropdown.active {
+    display: flex;
+}
+
+.auth-dropdown-header {
+    padding: 8px 14px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #94a3b8;
+}
+
+.auth-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    color: #334155;
+    cursor: pointer;
+    border-radius: 8px;
+    text-align: left;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.auth-dropdown-item:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.auth-dropdown-danger {
+    color: #ef4444;
+}
+
+.auth-dropdown-danger:hover {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.auth-dropdown-divider {
+    height: 1px;
+    background: rgba(0, 0, 0, 0.07);
+    margin: 4px 0;
+}
+
+/* Small modal card variant (for delete confirmation) */
+.modal-card-sm {
+    max-width: 380px;
+    padding: 28px;
+}
+
+/* Two-button row inside modals */
+.modal-actions-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.submit-btn-secondary {
+    background: #f1f5f9;
+    color: #475569;
+    box-shadow: none;
+    flex: 1;
+}
+
+.submit-btn-secondary:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+    box-shadow: none;
+}
+
+.submit-btn-danger {
+    background: #ef4444;
+    color: white;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    flex: 1;
+}
+
+.submit-btn-danger:hover {
+    background: #dc2626;
+    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.35);
+}
+
+.submit-btn-danger:active {
+    transform: scale(0.98);
+}
+
