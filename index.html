@@ -220,6 +220,7 @@
             </div>
             <div id="panel-landlord-info" class="panel-landlord-info"></div>
             <div class="panel-actions" id="panel-actions-edit">
+                <button type="button" class="panel-btn-secondary" id="panel-delete-btn" onclick="deletePropertyFromPanel()" style="display:none; background:#fee2e2; color:#ef4444; border:1px solid #fca5a5;">Delete Pinpoint</button>
                 <button type="button" class="panel-btn-secondary" id="panel-cancel-btn" onclick="closePropertyPanel()">Cancel</button>
                 <button type="submit" class="panel-btn-primary" id="panel-save-btn">Add Property</button>
             </div>
@@ -602,14 +603,18 @@
                     openPropertyPanel('edit', index);
                 };
                 popupContent.querySelector('.remove-pin-btn').onclick = function() {
-                    if (confirm('Delete this property?')) {
-                        fetch('/api/properties/' + data.id, {
+                    if (confirm('Delete this property pinpoint?')) {
+                        fetch('/api/properties/' + data.id + '?user_id=' + currentUser.id, {
                             method: 'DELETE',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ user_id: currentUser.id })
                         })
                         .then(function(res) { return res.json(); })
                         .then(function(result) {
+                            if (result.error) {
+                                alert(result.error);
+                                return;
+                            }
                             map.removeLayer(data.marker);
                             landlordMarkers.splice(index, 1);
                             editingMarkerIndex = -1;
@@ -640,11 +645,52 @@
         var panelMode = '';
         var pendingLatLng = null;
 
+        function deletePropertyFromPanel() {
+            if (editingMarkerIndex < 0 || !currentUser) return;
+            var data = landlordMarkers[editingMarkerIndex];
+            if (!data) return;
+
+            if (confirm('Are you sure you want to delete this pinpoint listing?')) {
+                var deleteBtn = document.getElementById('panel-delete-btn');
+                var originalText = deleteBtn.innerText;
+                deleteBtn.disabled = true;
+                deleteBtn.innerText = 'Deleting...';
+
+                fetch('/api/properties/' + data.id + '?user_id=' + currentUser.id, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUser.id })
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(result) {
+                    if (result.error) {
+                        alert(result.error);
+                        deleteBtn.disabled = false;
+                        deleteBtn.innerText = originalText;
+                        return;
+                    }
+                    map.removeLayer(data.marker);
+                    landlordMarkers.splice(editingMarkerIndex, 1);
+                    editingMarkerIndex = -1;
+                    rebuildAllPopups();
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerText = originalText;
+                    closePropertyPanel();
+                })
+                .catch(function(err) {
+                    alert('Failed to delete property: ' + err.message);
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerText = originalText;
+                });
+            }
+        }
+
         function openPropertyPanel(mode, index) {
             panelMode = mode;
             var panel = document.getElementById('property-panel');
             var title = document.getElementById('panel-title-text');
             var saveBtn = document.getElementById('panel-save-btn');
+            var deleteBtn = document.getElementById('panel-delete-btn');
             var nameInput = document.getElementById('panel-name');
             var descInput = document.getElementById('panel-desc');
             var priceInput = document.getElementById('panel-price');
@@ -664,6 +710,7 @@
             if (mode === 'create') {
                 title.innerText = 'Add Property';
                 saveBtn.innerText = 'Add Property';
+                if (deleteBtn) deleteBtn.style.display = 'none';
                 nameInput.value = '';
                 nameInput.disabled = false;
                 descInput.value = '';
@@ -687,6 +734,7 @@
                 var data = landlordMarkers[index];
                 title.innerText = 'Edit Property';
                 saveBtn.innerText = 'Save Changes';
+                if (deleteBtn) deleteBtn.style.display = 'inline-flex';
                 nameInput.value = data.name || '';
                 nameInput.disabled = false;
                 descInput.value = data.desc || '';
@@ -705,6 +753,7 @@
                 document.getElementById('panel-coords').innerText =
                     data.lat.toFixed(5) + ', ' + data.lng.toFixed(5);
             } else if (mode === 'view') {
+                if (deleteBtn) deleteBtn.style.display = 'none';
                 var data = landlordMarkers[index];
                 title.innerText = data.name || 'Property Details';
                 nameInput.value = data.name || '';

@@ -439,7 +439,7 @@ app.put('/api/properties/:id', async (req, res) => {
 // DELETE PROPERTY
 app.delete('/api/properties/:id', async (req, res) => {
     const { id } = req.params;
-    const { user_id } = req.body;
+    const user_id = (req.body && req.body.user_id) ? req.body.user_id : req.query.user_id;
     if (!user_id) return res.status(400).json({ error: 'user_id is required.' });
 
     try {
