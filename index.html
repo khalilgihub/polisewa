@@ -204,26 +204,18 @@
                 <input type="tel" id="panel-phone" placeholder="+60123456789" />
             </div>
             <div class="input-group" id="panel-image-group">
-                <label>Property Photo</label>
-                <div class="panel-image-upload">
-                    <input type="file" id="panel-image-input" accept="image/*" hidden />
-                    <div class="panel-image-preview" id="panel-image-preview">
-                        <div class="panel-image-empty" id="panel-image-empty">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                <polyline points="21 15 16 10 5 21"></polyline>
-                            </svg>
-                            <span>Click to add a photo of your place</span>
-                        </div>
-                        <img id="panel-image-img" alt="Property photo" style="display:none;" />
-                        <button type="button" class="panel-image-remove" id="panel-image-remove" title="Remove photo" style="display:none;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
-                    </div>
+                <label id="panel-image-label">Property Photos (Up to 5)</label>
+                <!-- Multi-file input for Landlord Uploads -->
+                <input type="file" id="panel-image-input" accept="image/*" multiple hidden onchange="handleImageSelection(event)" />
+                
+                <!-- Landlord Multiple Image Container Grid (Edit/Create mode) -->
+                <div id="panel-image-edit-container" style="display:none; width: 100%;">
+                    <div class="panel-image-grid" id="panel-image-grid"></div>
+                </div>
+
+                <!-- User/Student Photo Gallery Viewer (View mode) -->
+                <div id="panel-image-view-container" style="display:none; width: 100%;">
+                    <div id="panel-gallery-view"></div>
                 </div>
             </div>
             <div id="panel-landlord-info" class="panel-landlord-info"></div>
@@ -238,10 +230,20 @@
     </div>
 
     <script>
-        // 1. Initialize Leaflet Map centered on Kuching
+        // Define geographic bounds for Kuching region (Lat 1.15..1.85, Lng 109.80..110.70)
+        var kuchingMaxBounds = L.latLngBounds(
+            L.latLng(1.15, 109.80),
+            L.latLng(1.85, 110.70)
+        );
+
+        // 1. Initialize Leaflet Map centered on Kuching with strict boundary enforcement
         var map = L.map('map', {
             zoomControl: false,
-            attributionControl: false
+            attributionControl: false,
+            maxBounds: kuchingMaxBounds,
+            maxBoundsViscosity: 1.0, // Prevents panning outside Kuching area
+            minZoom: 11,              // Prevents zooming out past Kuching region
+            maxZoom: 19
         }).setView([1.5535, 110.3593], 13);
 
         // 2. Add Base Map Tiles
@@ -288,8 +290,154 @@
         var currentUser = null;
         var landlordMarkers = [];
         var editingMarkerIndex = -1;
-        var pendingImageUrl = '';   // image URL staged for the next property save
-        var panelImageFile = null;  // file chosen in the panel, awaiting upload
+        var pendingImages = []; // Array of { url: string, file: File | null }
+
+        // Utility to parse single image string, JSON array, or comma-separated string
+        function parseImageUrls(imageVal) {
+            if (!imageVal) return [];
+            if (Array.isArray(imageVal)) return imageVal.filter(Boolean);
+            if (typeof imageVal === 'string') {
+                var trimmed = imageVal.trim();
+                if (trimmed.startsWith('[')) {
+                    try {
+                        var parsed = JSON.parse(trimmed);
+                        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+                    } catch (e) {}
+                }
+                if (trimmed.includes(',')) {
+                    return trimmed.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+                }
+                return [trimmed];
+            }
+            return [];
+        }
+
+        // Build HTML for Photo Gallery Carousel (used in Map Popups & View Panel)
+        function buildGalleryHtml(imageUrls, galleryId, isPopup) {
+            if (!imageUrls || imageUrls.length === 0) {
+                return '<div class="property-gallery-container ' + (isPopup ? 'popup-gallery-container' : '') + '" style="background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:13px;font-weight:500;">' +
+                    '<div style="text-align:center;">📷<br>No photos uploaded</div>' +
+                    '</div>';
+            }
+            if (imageUrls.length === 1) {
+                return '<div class="property-gallery-container ' + (isPopup ? 'popup-gallery-container' : '') + '">' +
+                    '<img class="gallery-slide-img" src="' + imageUrls[0] + '" alt="Property photo" />' +
+                    '</div>';
+            }
+
+            var escapedUrls = JSON.stringify(imageUrls).replace(/"/g, '&quot;');
+            var dotsHtml = '';
+            for (var i = 0; i < imageUrls.length; i++) {
+                dotsHtml += '<span class="gallery-dot ' + (i === 0 ? 'active' : '') + '" onclick="event.stopPropagation(); window.setGallerySlide(\'' + galleryId + '\', ' + i + ', ' + imageUrls.length + ')"></span>';
+            }
+
+            return '<div id="' + galleryId + '" class="property-gallery-container ' + (isPopup ? 'popup-gallery-container' : '') + '" data-index="0" data-urls="' + escapedUrls + '">' +
+                '<img class="gallery-slide-img" src="' + imageUrls[0] + '" alt="Property photo 1" />' +
+                '<button type="button" class="gallery-nav-btn prev" onclick="event.stopPropagation(); window.cycleGallery(\'' + galleryId + '\', -1, ' + imageUrls.length + ')" title="Previous photo">❮</button>' +
+                '<button type="button" class="gallery-nav-btn next" onclick="event.stopPropagation(); window.cycleGallery(\'' + galleryId + '\', 1, ' + imageUrls.length + ')" title="Next photo">❯</button>' +
+                '<span class="gallery-counter">1 / ' + imageUrls.length + '</span>' +
+                '<div class="gallery-dots">' + dotsHtml + '</div>' +
+                '</div>';
+        }
+
+        // Global carousel controls
+        window.cycleGallery = function(galleryId, delta, total) {
+            var container = document.getElementById(galleryId);
+            if (!container) return;
+            var currentIdx = parseInt(container.getAttribute('data-index') || '0', 10);
+            var newIdx = (currentIdx + delta + total) % total;
+            window.setGallerySlide(galleryId, newIdx, total);
+        };
+
+        window.setGallerySlide = function(galleryId, targetIndex, total) {
+            var container = document.getElementById(galleryId);
+            if (!container) return;
+            var urlsStr = container.getAttribute('data-urls') || '[]';
+            var urls = [];
+            try { urls = JSON.parse(urlsStr); } catch (e) {}
+
+            container.setAttribute('data-index', targetIndex);
+            var img = container.querySelector('.gallery-slide-img');
+            if (img && urls[targetIndex]) {
+                img.style.opacity = '0.4';
+                setTimeout(function() {
+                    img.src = urls[targetIndex];
+                    img.style.opacity = '1';
+                }, 100);
+            }
+            var counter = container.querySelector('.gallery-counter');
+            if (counter) {
+                counter.innerText = (targetIndex + 1) + ' / ' + total;
+            }
+            var dots = container.querySelectorAll('.gallery-dot');
+            for (var i = 0; i < dots.length; i++) {
+                if (i === targetIndex) dots[i].classList.add('active');
+                else dots[i].classList.remove('active');
+            }
+        };
+
+        // Render Landlord Multi-Picture Container Grid or User Gallery Viewer in Property Panel
+        function renderPanelImages(mode) {
+            var editContainer = document.getElementById('panel-image-edit-container');
+            var viewContainer = document.getElementById('panel-image-view-container');
+            var grid = document.getElementById('panel-image-grid');
+            var galleryView = document.getElementById('panel-gallery-view');
+            var label = document.getElementById('panel-image-label');
+
+            if (mode === 'create' || mode === 'edit') {
+                label.innerText = 'Property Photos (' + pendingImages.length + ' / 5)';
+                editContainer.style.display = 'block';
+                viewContainer.style.display = 'none';
+
+                var gridHtml = '';
+                for (var i = 0; i < pendingImages.length; i++) {
+                    var item = pendingImages[i];
+                    gridHtml += '<div class="panel-image-card ' + (i === 0 ? 'is-cover' : '') + '">' +
+                        '<img src="' + item.url + '" alt="Property photo ' + (i + 1) + '" />' +
+                        (i === 0 ? '<span class="cover-badge">Cover</span>' : '') +
+                        '<button type="button" class="remove-btn" onclick="removePendingImage(' + i + ')" title="Remove photo">✕</button>' +
+                        '</div>';
+                }
+                if (pendingImages.length < 5) {
+                    gridHtml += '<div class="panel-add-card" onclick="document.getElementById(\'panel-image-input\').click()">' +
+                        '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+                        '<span>Add Photo</span>' +
+                        '</div>';
+                }
+                grid.innerHTML = gridHtml;
+            } else { // 'view' mode
+                label.innerText = 'Property Photos';
+                editContainer.style.display = 'none';
+                viewContainer.style.display = 'block';
+                var urls = pendingImages.map(function(item) { return item.url; });
+                galleryView.innerHTML = buildGalleryHtml(urls, 'panel-view-gallery', false);
+            }
+        }
+
+        function handleImageSelection(event) {
+            var files = event.target.files;
+            if (!files || files.length === 0) return;
+            var maxAllowed = 5 - pendingImages.length;
+            if (maxAllowed <= 0) {
+                alert('Maximum 5 photos allowed per property.');
+                event.target.value = '';
+                return;
+            }
+
+            var countToAdd = Math.min(files.length, maxAllowed);
+            for (var i = 0; i < countToAdd; i++) {
+                var file = files[i];
+                var tempUrl = URL.createObjectURL(file);
+                pendingImages.push({ url: tempUrl, file: file });
+            }
+            event.target.value = '';
+            renderPanelImages(panelMode);
+        }
+
+        function removePendingImage(index) {
+            pendingImages.splice(index, 1);
+            renderPanelImages(panelMode);
+        }
 
         function loadProperties() {
             fetch('/api/properties')
@@ -366,7 +514,7 @@
             var data = landlordMarkers[index];
             var isOwner = currentUser && currentUser.id === data.user_id;
             var popupContent = document.createElement('div');
-            popupContent.style.minWidth = '180px';
+            popupContent.style.minWidth = '200px';
 
             var actionsHtml = '';
             if (isOwner) {
@@ -383,10 +531,8 @@
                 actionsHtml += "</div>";
             }
 
-            var imageHtml = '';
-            if (data.image) {
-                imageHtml = "<img class='popup-image-thumb' src='" + data.image + "' alt='Property photo' />";
-            }
+            var imageUrls = parseImageUrls(data.image);
+            var imageHtml = buildGalleryHtml(imageUrls, 'popup-gallery-' + index, true);
 
             popupContent.innerHTML = imageHtml +
                 "<b>" + data.name + "</b>" +
@@ -452,26 +598,12 @@
             var actionsView = document.getElementById('panel-actions-view');
             var landlordInfo = document.getElementById('panel-landlord-info');
             var imageGroup = document.getElementById('panel-image-group');
-            var imagePreview = document.getElementById('panel-image-preview');
-            var imageInput = document.getElementById('panel-image-input');
-            var imageImg = document.getElementById('panel-image-img');
-            var imageEmpty = document.getElementById('panel-image-empty');
-            var imageRemove = document.getElementById('panel-image-remove');
-
-            // Reset image state
-            panelImageFile = null;
-            pendingImageUrl = '';
 
             var isLandlord = currentUser && currentUser.role === 'landlord';
-            // Upload UI is only shown for landlords when adding/editing their own property
             if ((mode === 'create' || mode === 'edit') && isLandlord) {
                 imageGroup.style.display = 'flex';
-                imagePreview.classList.remove('disabled');
-                imageInput.disabled = false;
             } else {
                 imageGroup.style.display = 'flex';
-                imagePreview.classList.add('disabled');
-                imageInput.disabled = true;
             }
 
             if (mode === 'create') {
@@ -489,7 +621,8 @@
                 landlordInfo.style.display = 'none';
                 actionsEdit.style.display = 'flex';
                 actionsView.style.display = 'none';
-                setPanelImage('');
+                pendingImages = [];
+                renderPanelImages('create');
                 if (pendingLatLng) {
                     document.getElementById('panel-coords').innerText =
                         pendingLatLng.lat.toFixed(5) + ', ' + pendingLatLng.lng.toFixed(5);
@@ -511,8 +644,9 @@
                 landlordInfo.style.display = 'none';
                 actionsEdit.style.display = 'flex';
                 actionsView.style.display = 'none';
-                setPanelImage(data.image || '');
-                pendingImageUrl = data.image || '';
+                var urls = parseImageUrls(data.image);
+                pendingImages = urls.map(function(u) { return { url: u, file: null }; });
+                renderPanelImages('edit');
                 document.getElementById('panel-coords').innerText =
                     data.lat.toFixed(5) + ', ' + data.lng.toFixed(5);
             } else if (mode === 'view') {
@@ -538,7 +672,9 @@
                 landlordInfo.style.display = 'block';
                 actionsEdit.style.display = 'none';
                 actionsView.style.display = 'flex';
-                setPanelImage(data.image || '');
+                var urls = parseImageUrls(data.image);
+                pendingImages = urls.map(function(u) { return { url: u, file: null }; });
+                renderPanelImages('view');
                 document.getElementById('panel-coords').innerText =
                     data.lat.toFixed(5) + ', ' + data.lng.toFixed(5);
             }
@@ -546,34 +682,12 @@
             panel.classList.add('active');
         }
 
-        // Render the image preview inside the panel (used by all panel modes)
-        function setPanelImage(url) {
-            var imageImg = document.getElementById('panel-image-img');
-            var imageEmpty = document.getElementById('panel-image-empty');
-            var imageRemove = document.getElementById('panel-image-remove');
-            var preview = document.getElementById('panel-image-preview');
-            if (url) {
-                imageImg.src = url;
-                imageImg.style.display = 'block';
-                imageEmpty.style.display = 'none';
-                // Only show remove button if landlord is allowed to edit
-                var isLandlord = currentUser && currentUser.role === 'landlord';
-                imageRemove.style.display = (isLandlord && !preview.classList.contains('disabled')) ? 'flex' : 'none';
-            } else {
-                imageImg.removeAttribute('src');
-                imageImg.style.display = 'none';
-                imageEmpty.style.display = 'flex';
-                imageRemove.style.display = 'none';
-            }
-        }
-
         function closePropertyPanel() {
             document.getElementById('property-panel').classList.remove('active');
             panelMode = '';
             editingMarkerIndex = -1;
             pendingLatLng = null;
-            pendingImageUrl = '';
-            panelImageFile = null;
+            pendingImages = [];
             var input = document.getElementById('panel-image-input');
             if (input) input.value = '';
         }
@@ -590,8 +704,11 @@
             saveBtn.disabled = true;
             saveBtn.innerText = 'Saving...';
 
-            var proceed = function(finalImageUrl) {
-                pendingImageUrl = finalImageUrl;
+            var newFiles = pendingImages.filter(function(item) { return item.file !== null; });
+
+            var savePropertyWithFinalUrls = function(finalImageUrls) {
+                var finalImageStr = JSON.stringify(finalImageUrls);
+
                 if (panelMode === 'create') {
                     fetch('/api/properties', {
                         method: 'POST',
@@ -604,7 +721,7 @@
                             phone: phone,
                             lat: pendingLatLng.lat,
                             lng: pendingLatLng.lng,
-                            image: pendingImageUrl
+                            image: finalImageStr
                         })
                     })
                     .then(function(res) { return res.json(); })
@@ -627,7 +744,7 @@
                             landlord_name: currentUser.name,
                             lat: pendingLatLng.lat,
                             lng: pendingLatLng.lng,
-                            image: pendingImageUrl
+                            image: finalImageStr
                         };
                         var index = landlordMarkers.length;
                         landlordMarkers.push(propertyData);
@@ -666,7 +783,7 @@
                     data.desc = desc;
                     data.price = price;
                     data.phone = phone;
-                    data.image = pendingImageUrl;
+                    data.image = finalImageStr;
 
                     fetch('/api/properties/' + data.id, {
                         method: 'PUT',
@@ -677,7 +794,7 @@
                             desc: desc,
                             price: price,
                             phone: phone,
-                            image: pendingImageUrl
+                            image: finalImageStr
                         })
                     })
                     .then(function(res) { return res.json(); })
@@ -695,11 +812,12 @@
                 }
             };
 
-            // If a new image file was selected, upload it first
-            if (panelImageFile) {
+            if (newFiles.length > 0) {
                 var formData = new FormData();
-                formData.append('image', panelImageFile);
-                fetch('/api/properties/upload-image', {
+                newFiles.forEach(function(item) {
+                    formData.append('images', item.file);
+                });
+                fetch('/api/properties/upload-images', {
                     method: 'POST',
                     body: formData
                 })
@@ -711,7 +829,15 @@
                         saveBtn.innerText = originalText;
                         return;
                     }
-                    proceed(uploadResult.imageUrl);
+                    var uploadedUrls = uploadResult.imageUrls || [];
+                    var uploadedIdx = 0;
+                    var finalUrls = pendingImages.map(function(item) {
+                        if (item.file !== null && uploadedUrls[uploadedIdx]) {
+                            return uploadedUrls[uploadedIdx++];
+                        }
+                        return item.url;
+                    });
+                    savePropertyWithFinalUrls(finalUrls);
                 })
                 .catch(function(err) {
                     alert('Image upload failed: ' + err.message);
@@ -719,60 +845,20 @@
                     saveBtn.innerText = originalText;
                 });
             } else {
-                // Keep the existing image URL (may be empty)
-                proceed(pendingImageUrl);
+                var finalUrls = pendingImages.map(function(item) { return item.url; });
+                savePropertyWithFinalUrls(finalUrls);
             }
         }
 
-        // Image upload UI inside the property panel (landlord only)
-        (function setupPanelImageUpload() {
-            var preview = document.getElementById('panel-image-preview');
-            var input = document.getElementById('panel-image-input');
-            var removeBtn = document.getElementById('panel-image-remove');
-            var imageImg = document.getElementById('panel-image-img');
-            var imageEmpty = document.getElementById('panel-image-empty');
 
-            preview.addEventListener('click', function() {
-                if (preview.classList.contains('disabled')) return;
-                input.click();
-            });
-
-            input.addEventListener('change', function() {
-                var file = input.files && input.files[0];
-                if (!file) return;
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('Image must be smaller than 5MB.');
-                    input.value = '';
-                    return;
-                }
-                panelImageFile = file;
-                pendingImageUrl = ''; // uploaded URL will replace this
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    imageImg.src = e.target.result;
-                    imageImg.style.display = 'block';
-                    imageEmpty.style.display = 'none';
-                    removeBtn.style.display = 'flex';
-                };
-                reader.readAsDataURL(file);
-            });
-
-            removeBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                if (preview.classList.contains('disabled')) return;
-                panelImageFile = null;
-                pendingImageUrl = '';
-                input.value = '';
-                imageImg.removeAttribute('src');
-                imageImg.style.display = 'none';
-                imageEmpty.style.display = 'flex';
-                removeBtn.style.display = 'none';
-            });
-        })();
 
         // Landlord click to add marker
         map.on('click', function(e) {
             if (currentUser && currentUser.role === 'landlord') {
+                if (!kuchingMaxBounds.contains(e.latlng)) {
+                    alert("Please select a location inside the Kuching area.");
+                    return;
+                }
                 var myCount = 0;
                 for (var i = 0; i < landlordMarkers.length; i++) {
                     if (landlordMarkers[i].user_id === currentUser.id) {
@@ -797,17 +883,24 @@
             }
         });
 
-        // 3. Geocoding Search Function
+        // 3. Geocoding Search Function (Strictly localized to Kuching, Sarawak)
         function performSearch() {
             var query = document.getElementById("search-input").value.trim();
             if (!query) return;
 
             var resultsContainer = document.getElementById("search-results");
-            resultsContainer.innerHTML = '<div style="padding: 12px 16px; color: #64748b; font-size: 14px;">Searching...</div>';
+            resultsContainer.innerHTML = '<div style="padding: 12px 16px; color: #64748b; font-size: 14px;">Searching in Kuching...</div>';
             resultsContainer.style.display = 'block';
 
-            // Query OpenStreetMap Nominatim Free Search API
-            var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&limit=5';
+            // Ensure query contains 'Kuching' to bias search results locally
+            var queryFormatted = query;
+            if (!queryFormatted.toLowerCase().includes('kuching')) {
+                queryFormatted += ', Kuching, Sarawak';
+            }
+
+            // Query Nominatim API with countrycodes=my, viewbox for Kuching, and bounded=1
+            var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(queryFormatted) +
+                '&countrycodes=my&viewbox=109.80,1.85,110.70,1.15&bounded=1&limit=5';
 
             fetch(url)
                 .then(function (response) {
@@ -816,13 +909,20 @@
                 .then(function (data) {
                     resultsContainer.innerHTML = '';
 
-                    if (data.length === 0) {
-                        resultsContainer.innerHTML = '<div style="padding: 12px 16px; color: #ef4444; font-size: 14px;">No locations found. Try being more specific.</div>';
+                    // Filter results to ensure they stay within Kuching bounds
+                    var localResults = data.filter(function (item) {
+                        var lat = parseFloat(item.lat);
+                        var lon = parseFloat(item.lon);
+                        return kuchingMaxBounds.contains([lat, lon]);
+                    });
+
+                    if (localResults.length === 0) {
+                        resultsContainer.innerHTML = '<div style="padding: 12px 16px; color: #ef4444; font-size: 14px;">No locations found in Kuching. Try another keyword like "Matang", "Satok", or "Politeknik".</div>';
                         return;
                     }
 
                     // Loop through results and build dropdown list
-                    data.forEach(function (item) {
+                    localResults.forEach(function (item) {
                         var div = document.createElement('div');
                         div.className = 'result-item';
                         div.innerText = item.display_name;

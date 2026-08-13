@@ -182,12 +182,26 @@ initDatabase();
 
 // --- ROUTES ---
 
-// Upload a property image
+// Upload single property image (legacy/fallback)
 app.post('/api/properties/upload-image', upload.single('image'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No image file provided.' });
+    const url = '/uploads/' + req.file.filename;
     res.status(201).json({
         message: 'Image uploaded.',
-        imageUrl: '/uploads/' + req.file.filename
+        imageUrl: url,
+        imageUrls: [url]
+    });
+});
+
+// Upload multiple property images
+app.post('/api/properties/upload-images', upload.array('images', 10), (req, res) => {
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: 'No image files provided.' });
+    }
+    const imageUrls = req.files.map(f => '/uploads/' + f.filename);
+    res.status(201).json({
+        message: `${imageUrls.length} images uploaded.`,
+        imageUrls: imageUrls
     });
 });
 
