@@ -267,6 +267,61 @@
             console.error("kuchingBoundary variable is not defined.");
         }
 
+        // Stitch multi-segment boundary lines into closed polygon rings
+        var kuchingPolygonRings = [];
+        if (typeof kuchingBoundary !== 'undefined' && kuchingBoundary.geometry && kuchingBoundary.geometry.coordinates) {
+            var segments = JSON.parse(JSON.stringify(kuchingBoundary.geometry.coordinates));
+            function ptEq(p1, p2) { return Math.abs(p1[0]-p2[0]) < 1e-6 && Math.abs(p1[1]-p2[1]) < 1e-6; }
+            while (segments.length > 0) {
+                var currentRing = segments.shift();
+                var grew = true;
+                while (grew) {
+                    grew = false;
+                    var start = currentRing[0];
+                    var end = currentRing[currentRing.length - 1];
+                    for (var i = 0; i < segments.length; i++) {
+                        var seg = segments[i];
+                        if (ptEq(end, seg[0])) {
+                            currentRing.push.apply(currentRing, seg.slice(1));
+                            segments.splice(i, 1);
+                            grew = true; break;
+                        } else if (ptEq(end, seg[seg.length - 1])) {
+                            currentRing.push.apply(currentRing, seg.slice(0, -1).reverse());
+                            segments.splice(i, 1);
+                            grew = true; break;
+                        } else if (ptEq(start, seg[seg.length - 1])) {
+                            currentRing.unshift.apply(currentRing, seg.slice(0, -1));
+                            segments.splice(i, 1);
+                            grew = true; break;
+                        } else if (ptEq(start, seg[0])) {
+                            currentRing.unshift.apply(currentRing, seg.slice(1).reverse());
+                            segments.splice(i, 1);
+                            grew = true; break;
+                        }
+                    }
+                }
+                kuchingPolygonRings.push(currentRing);
+            }
+        }
+
+        // Ray-casting point-in-polygon check against the exact orange Kuching boundary line
+        function isInsideKuchingBoundary(lat, lng) {
+            if (!kuchingMaxBounds.contains([lat, lng])) return false;
+            if (kuchingPolygonRings.length === 0) return true;
+
+            var isInside = false;
+            for (var r = 0; r < kuchingPolygonRings.length; r++) {
+                var ring = kuchingPolygonRings[r];
+                for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                    var xi = ring[i][0], yi = ring[i][1];
+                    var xj = ring[j][0], yj = ring[j][1];
+                    var intersect = ((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+                    if (intersect) isInside = !isInside;
+                }
+            }
+            return isInside;
+        }
+
 
 
         // 5. Special Pinpoint: Politeknik Kuching Sarawak (Normal Marker with graduation cap icon)
@@ -855,8 +910,8 @@
         // Landlord click to add marker
         map.on('click', function(e) {
             if (currentUser && currentUser.role === 'landlord') {
-                if (!kuchingMaxBounds.contains(e.latlng)) {
-                    alert("Please select a location inside the Kuching area.");
+                if (!isInsideKuchingBoundary(e.latlng.lat, e.latlng.lng)) {
+                    alert("Please select a location inside the orange Kuching boundary line.");
                     return;
                 }
                 var myCount = 0;
@@ -909,11 +964,11 @@
                 .then(function (data) {
                     resultsContainer.innerHTML = '';
 
-                    // Filter results to ensure they stay within Kuching bounds
+                    // Filter results to ensure they stay strictly within orange Kuching boundary
                     var localResults = data.filter(function (item) {
                         var lat = parseFloat(item.lat);
                         var lon = parseFloat(item.lon);
-                        return kuchingMaxBounds.contains([lat, lon]);
+                        return isInsideKuchingBoundary(lat, lon);
                     });
 
                     if (localResults.length === 0) {
