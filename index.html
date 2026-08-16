@@ -246,7 +246,7 @@
                 <input type="tel" id="panel-phone" placeholder="+60123456789" inputmode="tel" pattern="[0-9+]+" oninput="this.value = this.value.replace(/[^0-9+]/g, '')" />
             </div>
             <div class="input-group" id="panel-image-group">
-                <label id="panel-image-label">Property Photos (Up to 5)</label>
+                <label id="panel-image-label">Property Photos (Up to 10)</label>
                 <!-- Multi-file input for Landlord Uploads -->
                 <input type="file" id="panel-image-input" accept="image/*" multiple hidden onchange="handleImageSelection(event)" />
                 
@@ -549,7 +549,7 @@
             }, { passive: true });
         }
 
-        // Render Landlord Multi-Picture Container Grid or User Gallery Viewer in Property Panel
+        // Render Landlord Multi-Picture Container Grid or User Gallery Viewer in Property Panel (Up to 10 photos)
         function renderPanelImages(mode) {
             var editContainer = document.getElementById('panel-image-edit-container');
             var viewContainer = document.getElementById('panel-image-view-container');
@@ -558,7 +558,7 @@
             var label = document.getElementById('panel-image-label');
 
             if (mode === 'create' || mode === 'edit') {
-                label.innerText = 'Property Photos (' + pendingImages.length + ' / 5)';
+                label.innerText = 'Property Photos (' + pendingImages.length + ' / 10)';
                 editContainer.style.display = 'block';
                 viewContainer.style.display = 'none';
 
@@ -571,7 +571,7 @@
                         '<button type="button" class="remove-btn" onclick="removePendingImage(' + i + ')" title="Remove photo" aria-label="Remove photo">✕</button>' +
                         '</div>';
                 }
-                if (pendingImages.length < 5) {
+                if (pendingImages.length < 10) {
                     gridHtml += '<div class="panel-add-card" onclick="document.getElementById(\'panel-image-input\').click()">' +
                         '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
                         '<span>Add Photo</span>' +
@@ -590,9 +590,9 @@
         function handleImageSelection(event) {
             var files = event.target.files;
             if (!files || files.length === 0) return;
-            var maxAllowed = 5 - pendingImages.length;
+            var maxAllowed = 10 - pendingImages.length;
             if (maxAllowed <= 0) {
-                alert('Maximum 5 photos allowed per property.');
+                alert('Maximum 10 photos allowed per property.');
                 event.target.value = '';
                 return;
             }
@@ -641,16 +641,8 @@
                         landlordMarkers.push(propertyData);
                         marker.bindPopup(createMarkerPopup(index));
                         marker.on('click', (function(idx) {
-                            return function() {
-                                var data = landlordMarkers[idx];
-                                var isOwner = currentUser && currentUser.id === data.user_id;
-                                if (isOwner) {
-                                    map.closePopup();
-                                    openPropertyPanel('edit', idx);
-                                } else {
-                                    map.closePopup();
-                                    openPropertyPanel('view', idx);
-                                }
+                            return function(e) {
+                                map.panTo(e.latlng, { animate: true });
                             };
                         })(index));
                     }
@@ -664,20 +656,13 @@
 
         function rebuildAllPopups() {
             for (var i = 0; i < landlordMarkers.length; i++) {
-                landlordMarkers[i].marker.unbindPopup();
-                landlordMarkers[i].marker.bindPopup(createMarkerPopup(i));
-                landlordMarkers[i].marker.off('click');
-                landlordMarkers[i].marker.on('click', (function(idx) {
-                    return function() {
-                        var data = landlordMarkers[idx];
-                        var isOwner = currentUser && currentUser.id === data.user_id;
-                        if (isOwner) {
-                            map.closePopup();
-                            openPropertyPanel('edit', idx);
-                        } else {
-                            map.closePopup();
-                            openPropertyPanel('view', idx);
-                        }
+                var item = landlordMarkers[i];
+                item.marker.unbindPopup();
+                item.marker.bindPopup(createMarkerPopup(i));
+                item.marker.off('click');
+                item.marker.on('click', (function(idx) {
+                    return function(e) {
+                        map.panTo(e.latlng, { animate: true });
                     };
                 })(i));
             }
@@ -685,21 +670,22 @@
 
         function createMarkerPopup(index) {
             var data = landlordMarkers[index];
+            if (!data) return document.createElement('div');
             var isOwner = currentUser && currentUser.id === data.user_id;
             var popupContent = document.createElement('div');
-            popupContent.style.minWidth = '200px';
+            popupContent.style.minWidth = '220px';
 
             var actionsHtml = '';
             if (isOwner) {
-                actionsHtml = "<div style='margin-top:8px;display:flex;gap:6px;'>" +
-                    "<button class='edit-pin-btn' style='padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#2563eb;color:white;border:none;border-radius:6px;'>Edit Listing</button>" +
-                    "<button class='remove-pin-btn' style='padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#fee2e2;color:#ef4444;border:none;border-radius:6px;'>Delete</button>" +
+                actionsHtml = "<div style='margin-top:10px;display:flex;gap:8px;'>" +
+                    "<button class='edit-pin-btn' style='flex:1;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#2563eb;color:white;border:none;border-radius:8px;box-shadow:0 2px 6px rgba(37,99,235,0.3);'>Edit Listing</button>" +
+                    "<button class='remove-pin-btn' style='padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#fee2e2;color:#ef4444;border:none;border-radius:8px;'>Delete</button>" +
                     "</div>";
             } else {
-                actionsHtml = "<div style='margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:6px;'>" +
-                    "<button class='view-pin-btn' style='padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#2563eb;color:white;border:none;border-radius:6px;'>View Details</button>";
+                actionsHtml = "<div style='margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:6px;'>" +
+                    "<button class='view-pin-btn' style='padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;background:#2563eb;color:white;border:none;border-radius:8px;'>View Details</button>";
                 if (data.landlord_name) {
-                    actionsHtml += "<small style='color:#64748b;'>" + data.landlord_name + "</small>";
+                    actionsHtml += "<small style='color:#64748b;font-weight:500;'>" + data.landlord_name + "</small>";
                 }
                 actionsHtml += "</div>";
             }
@@ -708,45 +694,55 @@
             var imageHtml = buildGalleryHtml(imageUrls, 'popup-gallery-' + index, true);
 
             popupContent.innerHTML = imageHtml +
-                "<div style='font-size:15px;font-weight:700;color:#0f172a;margin-bottom:2px;'>" + data.name + "</div>" +
-                (data.desc ? "<div style='font-size:12px;color:#64748b;margin-bottom:4px;'>" + data.desc + "</div>" : "") +
-                (data.price ? "<div style='color:#2563eb;font-weight:700;font-size:14px;margin-bottom:6px;'>RM " + data.price + "<span style='font-size:11px;font-weight:400;color:#64748b;'>/month</span></div>" : "") +
+                "<div style='font-size:16px;font-weight:700;color:#0f172a;margin-bottom:3px;'>" + (data.name || 'Property') + "</div>" +
+                (data.desc ? "<div style='font-size:12px;color:#64748b;margin-bottom:6px;line-height:1.4;'>" + data.desc + "</div>" : "") +
+                (data.price ? "<div style='color:#2563eb;font-weight:700;font-size:15px;margin-bottom:8px;'>RM " + data.price + "<span style='font-size:11px;font-weight:400;color:#64748b;'> /month</span></div>" : "") +
                 (data.phone ? buildContactButtonsHtml(data.phone) : "") +
                 actionsHtml;
 
             if (isOwner) {
-                popupContent.querySelector('.edit-pin-btn').onclick = function() {
-                    map.closePopup();
-                    openPropertyPanel('edit', index);
-                };
-                popupContent.querySelector('.remove-pin-btn').onclick = function() {
-                    if (confirm('Delete this property listing?')) {
-                        fetch('/api/properties/' + data.id + '?user_id=' + currentUser.id, {
-                            method: 'DELETE',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ user_id: currentUser.id })
-                        })
-                        .then(function(res) { return res.json(); })
-                        .then(function(result) {
-                            if (result.error) {
-                                alert(result.error);
-                                return;
-                            }
-                            map.removeLayer(data.marker);
-                            landlordMarkers.splice(index, 1);
-                            editingMarkerIndex = -1;
-                            rebuildAllPopups();
-                        })
-                        .catch(function(err) {
-                            alert('Failed to delete property: ' + err.message);
-                        });
-                    }
-                };
+                var editBtn = popupContent.querySelector('.edit-pin-btn');
+                if (editBtn) {
+                    editBtn.onclick = function(e) {
+                        e.stopPropagation();
+                        openPropertyPanel('edit', index);
+                    };
+                }
+                var removeBtn = popupContent.querySelector('.remove-pin-btn');
+                if (removeBtn) {
+                    removeBtn.onclick = function(e) {
+                        e.stopPropagation();
+                        if (confirm('Delete this property listing?')) {
+                            fetch('/api/properties/' + data.id + '?user_id=' + currentUser.id, {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ user_id: currentUser.id })
+                            })
+                            .then(function(res) { return res.json(); })
+                            .then(function(result) {
+                                if (result.error) {
+                                    alert(result.error);
+                                    return;
+                                }
+                                map.removeLayer(data.marker);
+                                landlordMarkers.splice(index, 1);
+                                editingMarkerIndex = -1;
+                                rebuildAllPopups();
+                            })
+                            .catch(function(err) {
+                                alert('Failed to delete property: ' + err.message);
+                            });
+                        }
+                    };
+                }
             } else {
-                popupContent.querySelector('.view-pin-btn').onclick = function() {
-                    map.closePopup();
-                    openPropertyPanel('view', index);
-                };
+                var viewBtn = popupContent.querySelector('.view-pin-btn');
+                if (viewBtn) {
+                    viewBtn.onclick = function(e) {
+                        e.stopPropagation();
+                        openPropertyPanel('view', index);
+                    };
+                }
             }
 
             return popupContent;
@@ -754,8 +750,9 @@
 
         function refreshPopup(index) {
             var data = landlordMarkers[index];
-            if (data.marker.getPopup()) {
-                data.marker.setPopupContent(createMarkerPopup(index));
+            if (data && data.marker) {
+                data.marker.unbindPopup();
+                data.marker.bindPopup(createMarkerPopup(index));
             }
         }
 
@@ -764,7 +761,8 @@
 
         function deletePropertyFromPanel() {
             if (editingMarkerIndex < 0 || !currentUser) return;
-            var data = landlordMarkers[editingMarkerIndex];
+            var targetIndex = editingMarkerIndex;
+            var data = landlordMarkers[targetIndex];
             if (!data) return;
 
             if (confirm('Are you sure you want to delete this listing?')) {
@@ -778,16 +776,15 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ user_id: currentUser.id })
                 })
-                .then(function(res) { return res.json(); })
+                .then(function(res) {
+                    return res.json().then(function(d) {
+                        if (!res.ok) throw new Error(d.error || 'Failed to delete property');
+                        return d;
+                    });
+                })
                 .then(function(result) {
-                    if (result.error) {
-                        alert(result.error);
-                        deleteBtn.disabled = false;
-                        deleteBtn.innerText = originalText;
-                        return;
-                    }
                     map.removeLayer(data.marker);
-                    landlordMarkers.splice(editingMarkerIndex, 1);
+                    landlordMarkers.splice(targetIndex, 1);
                     editingMarkerIndex = -1;
                     rebuildAllPopups();
                     deleteBtn.disabled = false;
@@ -817,7 +814,6 @@
             var landlordInfo = document.getElementById('panel-landlord-info');
             var imageGroup = document.getElementById('panel-image-group');
 
-            var isLandlord = currentUser && currentUser.role === 'landlord';
             imageGroup.style.display = 'flex';
 
             if (mode === 'create') {
@@ -945,15 +941,13 @@
                             image: finalImageStr
                         })
                     })
-                    .then(function(res) { return res.json(); })
+                    .then(function(res) {
+                        return res.json().then(function(d) {
+                            if (!res.ok) throw new Error(d.error || 'Failed to create property.');
+                            return d;
+                        });
+                    })
                     .then(function(result) {
-                        if (result.error) {
-                            alert(result.error);
-                            saveBtn.disabled = false;
-                            saveBtn.innerText = originalText;
-                            return;
-                        }
-
                         // Remove temporary click marker and replace with saved interactive marker
                         if (pendingMarker) {
                             map.removeLayer(pendingMarker);
@@ -978,35 +972,36 @@
                         landlordMarkers.push(propertyData);
                         newMarker.bindPopup(createMarkerPopup(index));
                         newMarker.on('click', (function(idx) {
-                            return function() {
-                                var data = landlordMarkers[idx];
-                                if (currentUser && currentUser.id === data.user_id) {
-                                    map.closePopup();
-                                    openPropertyPanel('edit', idx);
-                                } else {
-                                    map.closePopup();
-                                    openPropertyPanel('view', idx);
-                                }
+                            return function(e) {
+                                map.panTo(e.latlng, { animate: true });
                             };
                         })(index));
-                        newMarker.openPopup();
+
                         saveBtn.disabled = false;
                         saveBtn.innerText = originalText;
                         closePropertyPanel();
+
+                        // Automatically pan to new marker and open its popup square
+                        setTimeout(function() {
+                            map.panTo([propertyData.lat, propertyData.lng], { animate: true });
+                            newMarker.openPopup();
+                        }, 150);
                     })
                     .catch(function(err) {
-                        alert('Failed to create property: ' + err.message);
+                        alert('Error creating property: ' + err.message);
                         saveBtn.disabled = false;
                         saveBtn.innerText = originalText;
                     });
                 } else if (panelMode === 'edit') {
-                    if (editingMarkerIndex < 0) {
+                    var targetIndex = editingMarkerIndex;
+                    if (targetIndex < 0 || !landlordMarkers[targetIndex]) {
                         saveBtn.disabled = false;
                         saveBtn.innerText = originalText;
+                        closePropertyPanel();
                         return;
                     }
 
-                    var data = landlordMarkers[editingMarkerIndex];
+                    var data = landlordMarkers[targetIndex];
                     data.name = name;
                     data.desc = desc;
                     data.price = price;
@@ -1025,15 +1020,32 @@
                             image: finalImageStr
                         })
                     })
-                    .then(function(res) { return res.json(); })
-                    .then(function() {
-                        refreshPopup(editingMarkerIndex);
+                    .then(function(res) {
+                        return res.json().then(function(d) {
+                            if (!res.ok) throw new Error(d.error || 'Failed to save property changes.');
+                            return d;
+                        });
+                    })
+                    .then(function(result) {
                         saveBtn.disabled = false;
                         saveBtn.innerText = originalText;
+
+                        // Rebuild the popup with updated data & images
+                        refreshPopup(targetIndex);
+
+                        // Close edit panel
                         closePropertyPanel();
+
+                        // Automatically pan to marker and REOPEN THE POPUP CARD SQUARE
+                        if (data && data.marker) {
+                            map.panTo(data.marker.getLatLng(), { animate: true });
+                            setTimeout(function() {
+                                data.marker.openPopup();
+                            }, 150);
+                        }
                     })
                     .catch(function(err) {
-                        alert('Failed to save property: ' + err.message);
+                        alert('Error saving property: ' + err.message);
                         saveBtn.disabled = false;
                         saveBtn.innerText = originalText;
                     });
@@ -1049,14 +1061,13 @@
                     method: 'POST',
                     body: formData
                 })
-                .then(function(res) { return res.json(); })
+                .then(function(res) {
+                    return res.json().then(function(d) {
+                        if (!res.ok) throw new Error(d.error || 'Failed to upload images.');
+                        return d;
+                    });
+                })
                 .then(function(uploadResult) {
-                    if (uploadResult.error) {
-                        alert('Image upload failed: ' + uploadResult.error);
-                        saveBtn.disabled = false;
-                        saveBtn.innerText = originalText;
-                        return;
-                    }
                     var uploadedUrls = uploadResult.imageUrls || [];
                     var uploadedIdx = 0;
                     var finalUrls = pendingImages.map(function(item) {
