@@ -155,12 +155,3 @@ pm2 start server.js --name "polisewa"
 ```
 
 Open **`http://localhost:3000`** in your browser.
-
----
-
-## 👥 Contributors & License
-
-Developed with ❤️ for the students and landlords of **Politeknik Kuching Sarawak**.
-
-- **Project Lead**: Abdul Khalil ([@khalilgihub](https://github.com/khalilgihub))
-- **Repository**: [https://github.com/khalilgihub/polisewa.git](https://github.com/khalilgihub/polisewa.git)
