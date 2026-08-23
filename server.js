@@ -16,7 +16,9 @@ function getMailTransporter() {
     const pass = process.env.EMAIL_APP_PASS;
     if (user && pass && pass.trim().length > 0) {
         return nodemailer.createTransport({
-            service: 'gmail',
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: true, // SSL
             auth: {
                 user: user.trim(),
                 pass: pass.replace(/\s+/g, '') // remove any spaces

@@ -1626,6 +1626,8 @@
         function showOtpForm(email) {
             pendingVerificationEmail = email;
             document.getElementById("otp-target-email").innerText = email;
+            var modalHeader = document.querySelector("#auth-modal .modal-header");
+            if (modalHeader) modalHeader.style.display = "none";
             document.getElementById("signin-form").style.display = "none";
             document.getElementById("signup-form").style.display = "none";
             document.querySelector(".role-selector").style.display = "none";
@@ -1643,6 +1645,8 @@
 
         function backToAuthForm() {
             if (otpTimerInterval) clearInterval(otpTimerInterval);
+            var modalHeader = document.querySelector("#auth-modal .modal-header");
+            if (modalHeader) modalHeader.style.display = "block";
             document.getElementById("otp-form").style.display = "none";
             document.querySelector(".role-selector").style.display = "flex";
             document.querySelector(".form-toggle").style.display = "flex";
