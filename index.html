@@ -28,7 +28,7 @@
     <script src="boundary.js"></script>
 
     <!-- Custom Stylesheet -->
-    <link rel="stylesheet" href="style.css?v=20260823_3" />
+    <link rel="stylesheet" href="style.css?v=20260823_4" />
 </head>
 
 <body>
@@ -182,7 +182,7 @@
                     <button type="submit" class="submit-btn">Create Account</button>
                 </form>
 
-                <!-- OTP Verification Form Screen (Redesigned) -->
+                <!-- OTP Verification Form Screen (6-Digit Grid) -->
                 <div id="otp-form" class="auth-form" style="display:none;">
                     <div class="otp-card-inner">
                         <div class="otp-icon-badge">
@@ -193,13 +193,18 @@
                         </div>
                         <h2 class="otp-modal-title">Verify Your Email</h2>
                         <p class="otp-modal-sub">
-                            We've sent a 6-digit verification code to<br>
+                            Enter the 6-digit code sent to<br>
                             <span id="otp-target-email" class="otp-highlight-email">user@example.com</span>
                         </p>
 
-                        <div class="otp-input-container">
-                            <label for="otp-input" class="otp-input-label">Enter 6-Digit Code</label>
-                            <input type="text" id="otp-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="• • • • • •" autocomplete="one-time-code" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+                        <!-- 6 Individual OTP Digit Boxes -->
+                        <div class="otp-inputs-grid" id="otp-grid">
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="0" autocomplete="off" />
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="1" autocomplete="off" />
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="2" autocomplete="off" />
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="3" autocomplete="off" />
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="4" autocomplete="off" />
+                            <input type="text" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]*" data-index="5" autocomplete="off" />
                         </div>
 
                         <button type="button" class="submit-btn" id="otp-verify-btn" onclick="handleVerifyOtp()">Verify & Continue</button>
@@ -210,12 +215,9 @@
                             <span id="otp-timer-text" style="display:none; font-weight: 600; color: var(--primary);"></span>
                         </div>
 
-                        <!-- Spam Folder Tip Box -->
-                        <div class="otp-spam-alert">
-                            <div class="otp-spam-alert-icon">💡</div>
-                            <div class="otp-spam-alert-text">
-                                <b>Can't find the email?</b> Check your <u>Spam / Junk</u> folder and click <b>"Report not spam"</b> so future rental notifications arrive directly in your Inbox.
-                            </div>
+                        <!-- Clean Helper Footnote -->
+                        <div class="otp-help-note">
+                            💡 Can't find it? Check your <b>Spam / Junk</b> folder and mark <b>"Not Spam"</b>.
                         </div>
 
                         <button type="button" class="otp-back-link" onclick="backToAuthForm()">
@@ -1643,6 +1645,67 @@
             document.getElementById("signup-form").style.display = type === 'signup' ? 'flex' : 'none';
         }
 
+        function getEnteredOtp() {
+            var digits = document.querySelectorAll('.otp-digit');
+            var code = "";
+            digits.forEach(function (d) { code += d.value.trim(); });
+            return code;
+        }
+
+        function setupOtpInputs() {
+            var digits = document.querySelectorAll('.otp-digit');
+            digits.forEach(function (input, index) {
+                input.oninput = function (e) {
+                    var val = input.value.replace(/[^0-9]/g, '');
+                    input.value = val;
+                    if (val.length === 1) {
+                        input.classList.add('filled');
+                        if (index < digits.length - 1) {
+                            digits[index + 1].focus();
+                            digits[index + 1].select();
+                        }
+                    } else {
+                        input.classList.remove('filled');
+                    }
+                    if (getEnteredOtp().length === 6) {
+                        handleVerifyOtp();
+                    }
+                };
+
+                input.onkeydown = function (e) {
+                    if (e.key === 'Backspace' && !input.value && index > 0) {
+                        digits[index - 1].focus();
+                        digits[index - 1].value = '';
+                        digits[index - 1].classList.remove('filled');
+                    }
+                    if (e.key === 'Enter') {
+                        handleVerifyOtp();
+                    }
+                };
+
+                input.onpaste = function (e) {
+                    e.preventDefault();
+                    var pasteData = (e.clipboardData || window.clipboardData).getData('text').trim().replace(/[^0-9]/g, '');
+                    if (pasteData) {
+                        for (var i = 0; i < digits.length; i++) {
+                            if (i < pasteData.length) {
+                                digits[i].value = pasteData[i];
+                                digits[i].classList.add('filled');
+                            } else {
+                                digits[i].value = '';
+                                digits[i].classList.remove('filled');
+                            }
+                        }
+                        var focusIndex = Math.min(pasteData.length, digits.length - 1);
+                        digits[focusIndex].focus();
+                        if (pasteData.length >= 6) {
+                            setTimeout(handleVerifyOtp, 100);
+                        }
+                    }
+                };
+            });
+        }
+
         function showOtpForm(email) {
             pendingVerificationEmail = email;
             document.getElementById("otp-target-email").innerText = email;
@@ -1654,11 +1717,12 @@
             document.querySelector(".form-toggle").style.display = "none";
 
             var otpForm = document.getElementById("otp-form");
-            otpForm.style.display = "block";
+            otpForm.style.display = "flex";
 
-            var otpInput = document.getElementById("otp-input");
-            otpInput.value = "";
-            setTimeout(function () { otpInput.focus(); }, 150);
+            var digits = document.querySelectorAll('.otp-digit');
+            digits.forEach(function (d) { d.value = ""; d.classList.remove('filled'); });
+            setupOtpInputs();
+            setTimeout(function () { digits[0].focus(); }, 150);
 
             startOtpCooldown(60);
         }
@@ -1698,11 +1762,13 @@
         }
 
         function handleVerifyOtp() {
-            var otpInput = document.getElementById("otp-input");
-            var otpCode = otpInput.value.trim();
+            var otpCode = getEnteredOtp();
             if (otpCode.length !== 6) {
                 alert("Please enter the complete 6-digit verification code.");
-                otpInput.focus();
+                var digits = document.querySelectorAll('.otp-digit');
+                for (var i = 0; i < digits.length; i++) {
+                    if (!digits[i].value) { digits[i].focus(); break; }
+                }
                 return;
             }
 
@@ -1736,7 +1802,9 @@
                 })
                 .catch(function (err) {
                     alert("Error: " + err.message);
-                    otpInput.focus();
+                    var digits = document.querySelectorAll('.otp-digit');
+                    digits.forEach(function (d) { d.value = ""; d.classList.remove('filled'); });
+                    digits[0].focus();
                 })
                 .finally(function () {
                     verifyBtn.disabled = false;
@@ -1763,6 +1831,9 @@
                 })
                 .then(function (data) {
                     alert(data.message || "New verification code sent!");
+                    var digits = document.querySelectorAll('.otp-digit');
+                    digits.forEach(function (d) { d.value = ""; d.classList.remove('filled'); });
+                    digits[0].focus();
                     startOtpCooldown(60);
                 })
                 .catch(function (err) {
