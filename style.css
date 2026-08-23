@@ -1386,6 +1386,112 @@ button, input, textarea, select {
 }
 
 /* ==========================================================================
+   OTP EMAIL VERIFICATION MODAL STYLES
+   ========================================================================== */
+.otp-header {
+    text-align: center;
+    margin-bottom: 18px;
+}
+
+.otp-icon-circle {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #eff6ff;
+    border: 2px solid #bfdbfe;
+    font-size: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+}
+
+.otp-header h3 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.otp-header p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+#otp-input {
+    width: 100%;
+    height: 50px;
+    text-align: center;
+    letter-spacing: 10px;
+    font-size: 22px;
+    font-weight: 700;
+    font-family: monospace, sans-serif;
+    color: var(--primary);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-page);
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+#otp-input:focus {
+    background: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px var(--primary-focus);
+}
+
+.otp-resend-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--text-sub);
+}
+
+#otp-resend-btn {
+    border: none;
+    background: none;
+    color: var(--primary);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    font-size: 13px;
+}
+
+#otp-resend-btn:hover {
+    color: var(--primary-hover);
+}
+
+#otp-resend-btn:disabled {
+    color: var(--text-muted);
+    cursor: not-allowed;
+    text-decoration: none;
+}
+
+.otp-back-btn {
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 14px;
+    text-align: center;
+    width: 100%;
+    transition: color 0.15s ease;
+}
+
+.otp-back-btn:hover {
+    color: var(--text-main);
+}
+
+/* ==========================================================================
    TABLET & INTERMEDIATE BREAKPOINT (769px - 1024px)
    ========================================================================== */
 

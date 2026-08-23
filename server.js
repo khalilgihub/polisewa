@@ -5,9 +5,97 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Gmail SMTP Email Transporter
+function getMailTransporter() {
+    const user = process.env.EMAIL_USER;
+    const pass = process.env.EMAIL_APP_PASS;
+    if (user && pass && pass.trim().length > 0) {
+        return nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: user.trim(),
+                pass: pass.replace(/\s+/g, '') // remove any spaces
+            }
+        });
+    }
+    return null;
+}
+
+// Send Branded HTML OTP Verification Email
+async function sendOtpEmail(toEmail, otpCode, userName) {
+    const transporter = getMailTransporter();
+    const emailUser = (process.env.EMAIL_USER && process.env.EMAIL_USER.trim()) || 'polisewa.official@gmail.com';
+
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; }
+                .container { max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+                .header { background: linear-gradient(135deg, #2563eb, #1d4ed8); padding: 32px 24px; text-align: center; color: #ffffff; }
+                .header h1 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+                .header p { margin: 8px 0 0; font-size: 13.5px; opacity: 0.92; }
+                .content { padding: 32px 28px; text-align: center; color: #1e293b; }
+                .greeting { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+                .text { font-size: 14px; line-height: 1.6; color: #64748b; margin-bottom: 24px; }
+                .otp-box { background: #eff6ff; border: 2px dashed #3b82f6; border-radius: 12px; padding: 16px 24px; display: inline-block; margin: 0 auto 20px; letter-spacing: 8px; font-size: 32px; font-weight: 800; color: #1e40af; font-family: monospace, sans-serif; }
+                .expiry { font-size: 12.5px; color: #94a3b8; margin-bottom: 20px; }
+                .footer { border-top: 1px solid #f1f5f9; padding: 20px 24px; font-size: 12px; color: #94a3b8; text-align: center; background: #f8fafc; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🎓 Polisewa</h1>
+                    <p>Student Accommodation & Room Rental Platform</p>
+                </div>
+                <div class="content">
+                    <div class="greeting">Hello ${userName || 'there'},</div>
+                    <div class="text">Thank you for registering on Polisewa. Please use the following 6-digit verification code to activate your account:</div>
+                    <div class="otp-box">${otpCode}</div>
+                    <div class="expiry">⏱️ This code will expire in <b>10 minutes</b>. Please do not share this code with anyone.</div>
+                </div>
+                <div class="footer">
+                    If you did not create an account on Polisewa, you can safely ignore this email.<br>
+                    &copy; ${new Date().getFullYear()} Polisewa. Kuching, Sarawak.
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+
+    if (!transporter) {
+        console.log(`\n======================================================`);
+        console.log(`📧 [EMAIL VERIFICATION - LOCAL CONSOLE MODE]`);
+        console.log(`To: ${toEmail}`);
+        console.log(`OTP Code: ${otpCode}`);
+        console.log(`(Add EMAIL_APP_PASS in .env to send via Gmail SMTP)`);
+        console.log(`======================================================\n`);
+        return { success: true, simulated: true };
+    }
+
+    try {
+        const info = await transporter.sendMail({
+            from: `"Polisewa" <${emailUser}>`,
+            to: toEmail,
+            subject: `${otpCode} is your Polisewa Verification Code`,
+            text: `Your Polisewa verification code is: ${otpCode}. It will expire in 10 minutes.`,
+            html: htmlContent
+        });
+        console.log(`✅ Verification email sent to ${toEmail} (Message ID: ${info.messageId})`);
+        return { success: true, simulated: false };
+    } catch (err) {
+        console.error(`❌ Failed to send verification email to ${toEmail}:`, err.message);
+        throw err;
+    }
+}
 
 // Enable CORS and JSON parsing middleware
 app.use(cors());
@@ -104,8 +192,26 @@ async function initMssqlTables(pool) {
                 phone NVARCHAR(50) NOT NULL,
                 password NVARCHAR(255) NOT NULL,
                 role NVARCHAR(50) NOT NULL,
-                extra NVARCHAR(MAX)
+                extra NVARCHAR(MAX),
+                is_verified INT DEFAULT 0,
+                otp_code NVARCHAR(10),
+                otp_expires_at DATETIME
             )
+        `);
+        await pool.request().query(`
+            IF EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+            AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'is_verified')
+            ALTER TABLE users ADD is_verified INT DEFAULT 0;
+        `);
+        await pool.request().query(`
+            IF EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+            AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'otp_code')
+            ALTER TABLE users ADD otp_code NVARCHAR(10);
+        `);
+        await pool.request().query(`
+            IF EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+            AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'otp_expires_at')
+            ALTER TABLE users ADD otp_expires_at DATETIME;
         `);
         await pool.request().query(`
             IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='properties' AND xtype='U')
@@ -142,11 +248,18 @@ function initSqliteTables() {
             phone TEXT NOT NULL,
             password TEXT NOT NULL,
             role TEXT CHECK(role IN ('student', 'landlord')) NOT NULL,
-            extra TEXT
+            extra TEXT,
+            is_verified INTEGER DEFAULT 0,
+            otp_code TEXT DEFAULT '',
+            otp_expires_at TEXT DEFAULT ''
         )
     `, (err) => {
         if (err) console.error('Error creating users table:', err.message);
         else console.log('Users table initialized successfully.');
+
+        sqliteDb.run(`ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0`, () => {});
+        sqliteDb.run(`ALTER TABLE users ADD COLUMN otp_code TEXT DEFAULT ''`, () => {});
+        sqliteDb.run(`ALTER TABLE users ADD COLUMN otp_expires_at TEXT DEFAULT ''`, () => {});
     });
 
     sqliteDb.run(`
@@ -205,7 +318,7 @@ app.post('/api/properties/upload-images', upload.array('images', 10), (req, res)
     });
 });
 
-// SIGN UP Endpoint
+// SIGN UP Endpoint (Generates OTP & sends verification email)
 app.post('/api/signup', async (req, res) => {
     const { name, email, phone, password, role, extra } = req.body;
     if (!name || !email || !phone || !password || !role) {
@@ -213,60 +326,237 @@ app.post('/api/signup', async (req, res) => {
     }
 
     const emailLower = email.toLowerCase().trim();
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
     try {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
         if (dbType === 'mssql') {
-            const result = await mssqlPool.request()
-                .input('name', sql.NVarChar, name)
+            const checkUser = await mssqlPool.request()
                 .input('email', sql.NVarChar, emailLower)
-                .input('phone', sql.NVarChar, phone)
-                .input('password', sql.NVarChar, hashedPassword)
-                .input('role', sql.NVarChar, role)
-                .input('extra', sql.NVarChar, extra || '')
-                .query(`
-                    INSERT INTO users (name, email, phone, password, role, extra)
-                    OUTPUT INSERTED.id
-                    VALUES (@name, @email, @phone, @password, @role, @extra)
-                `);
+                .query('SELECT * FROM users WHERE email = @email');
 
-            const newUserId = result.recordset[0].id;
-            return res.status(201).json({
-                message: 'Account created successfully!',
-                user: { id: newUserId, name, email: emailLower, phone, role, extra: extra || '' },
-                userId: newUserId
-            });
-        } else {
-            const sqlQuery = `INSERT INTO users (name, email, phone, password, role, extra) VALUES (?, ?, ?, ?, ?, ?)`;
-            sqliteDb.run(sqlQuery, [name, emailLower, phone, hashedPassword, role, extra || ''], function(err) {
-                if (err) {
-                    if (err.message.includes('UNIQUE constraint failed')) {
-                        return res.status(409).json({ error: 'An account with this email address already exists.' });
-                    }
-                    return res.status(500).json({ error: 'Database error: ' + err.message });
+            if (checkUser.recordset.length > 0) {
+                const existing = checkUser.recordset[0];
+                if (existing.is_verified === 1) {
+                    return res.status(409).json({ error: 'An account with this email address already exists. Please Sign In.' });
                 }
-                const newUserId = this.lastID;
-                sqliteDb.get(`SELECT id, name, email, phone, role, extra FROM users WHERE id = ?`, [newUserId], (err2, user) => {
-                    if (err2) return res.status(500).json({ error: 'Database error: ' + err2.message });
-                    res.status(201).json({
-                        message: 'Account created successfully!',
-                        user: user,
-                        userId: newUserId
-                    });
+                await mssqlPool.request()
+                    .input('id', sql.Int, existing.id)
+                    .input('name', sql.NVarChar, name)
+                    .input('phone', sql.NVarChar, phone)
+                    .input('password', sql.NVarChar, hashedPassword)
+                    .input('role', sql.NVarChar, role)
+                    .input('extra', sql.NVarChar, extra || '')
+                    .input('otp_code', sql.NVarChar, otpCode)
+                    .input('otp_expires_at', sql.DateTime, new Date(otpExpiresAt))
+                    .query(`
+                        UPDATE users
+                        SET name = @name, phone = @phone, password = @password, role = @role, extra = @extra, otp_code = @otp_code, otp_expires_at = @otp_expires_at, is_verified = 0
+                        WHERE id = @id
+                    `);
+            } else {
+                await mssqlPool.request()
+                    .input('name', sql.NVarChar, name)
+                    .input('email', sql.NVarChar, emailLower)
+                    .input('phone', sql.NVarChar, phone)
+                    .input('password', sql.NVarChar, hashedPassword)
+                    .input('role', sql.NVarChar, role)
+                    .input('extra', sql.NVarChar, extra || '')
+                    .input('otp_code', sql.NVarChar, otpCode)
+                    .input('otp_expires_at', sql.DateTime, new Date(otpExpiresAt))
+                    .query(`
+                        INSERT INTO users (name, email, phone, password, role, extra, is_verified, otp_code, otp_expires_at)
+                        VALUES (@name, @email, @phone, @password, @role, @extra, 0, @otp_code, @otp_expires_at)
+                    `);
+            }
+        } else {
+            const existing = await new Promise((resolve, reject) => {
+                sqliteDb.get(`SELECT * FROM users WHERE email = ?`, [emailLower], (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
                 });
             });
+
+            if (existing) {
+                if (existing.is_verified === 1) {
+                    return res.status(409).json({ error: 'An account with this email address already exists. Please Sign In.' });
+                }
+                await new Promise((resolve, reject) => {
+                    sqliteDb.run(
+                        `UPDATE users SET name = ?, phone = ?, password = ?, role = ?, extra = ?, otp_code = ?, otp_expires_at = ?, is_verified = 0 WHERE id = ?`,
+                        [name, phone, hashedPassword, role, extra || '', otpCode, otpExpiresAt, existing.id],
+                        (err) => { if (err) reject(err); else resolve(); }
+                    );
+                });
+            } else {
+                await new Promise((resolve, reject) => {
+                    sqliteDb.run(
+                        `INSERT INTO users (name, email, phone, password, role, extra, is_verified, otp_code, otp_expires_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+                        [name, emailLower, phone, hashedPassword, role, extra || '', otpCode, otpExpiresAt],
+                        (err) => { if (err) reject(err); else resolve(); }
+                    );
+                });
+            }
         }
+
+        // Send OTP via email
+        try {
+            await sendOtpEmail(emailLower, otpCode, name);
+        } catch (emailErr) {
+            console.error('Email send failure:', emailErr.message);
+        }
+
+        return res.status(200).json({
+            message: 'Verification code sent to your email.',
+            needsVerification: true,
+            email: emailLower
+        });
     } catch (err) {
         console.error('Signup error:', err);
-        if (err.number === 2627 || err.number === 2601 || (err.message && (err.message.includes('unique') || err.message.includes('duplicate')))) {
-            return res.status(409).json({ error: 'An account with this email address already exists.' });
-        }
         res.status(500).json({ error: 'Database error: ' + err.message });
     }
 });
 
-// SIGN IN Endpoint
+// VERIFY OTP Endpoint
+app.post('/api/verify-otp', async (req, res) => {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+        return res.status(400).json({ error: 'Email and 6-digit verification code are required.' });
+    }
+
+    const emailLower = email.toLowerCase().trim();
+    const cleanOtp = String(otp).trim();
+
+    try {
+        let user = null;
+        if (dbType === 'mssql') {
+            const result = await mssqlPool.request()
+                .input('email', sql.NVarChar, emailLower)
+                .query('SELECT * FROM users WHERE email = @email');
+            user = result.recordset[0];
+        } else {
+            user = await new Promise((resolve, reject) => {
+                sqliteDb.get(`SELECT * FROM users WHERE email = ?`, [emailLower], (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                });
+            });
+        }
+
+        if (!user) {
+            return res.status(404).json({ error: 'User account not found.' });
+        }
+
+        if (user.is_verified === 1) {
+            const { password: _, otp_code: __, otp_expires_at: ___, ...userData } = user;
+            return res.status(200).json({
+                message: 'Account already verified! Logged in successfully.',
+                user: userData
+            });
+        }
+
+        if (!user.otp_code || user.otp_code !== cleanOtp) {
+            return res.status(400).json({ error: 'Invalid verification code. Please check your email and try again.' });
+        }
+
+        if (user.otp_expires_at && new Date(user.otp_expires_at) < new Date()) {
+            return res.status(400).json({ error: 'Verification code has expired. Please click Resend Code.' });
+        }
+
+        // Activate user
+        if (dbType === 'mssql') {
+            await mssqlPool.request()
+                .input('id', sql.Int, user.id)
+                .query(`UPDATE users SET is_verified = 1, otp_code = '', otp_expires_at = NULL WHERE id = @id`);
+        } else {
+            await new Promise((resolve, reject) => {
+                sqliteDb.run(
+                    `UPDATE users SET is_verified = 1, otp_code = '', otp_expires_at = '' WHERE id = ?`,
+                    [user.id],
+                    (err) => { if (err) reject(err); else resolve(); }
+                );
+            });
+        }
+
+        const { password: _, otp_code: __, otp_expires_at: ___, ...userData } = user;
+        userData.is_verified = 1;
+
+        return res.status(200).json({
+            message: 'Email verified successfully! Welcome to Polisewa.',
+            user: userData
+        });
+    } catch (err) {
+        console.error('Verify OTP error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// RESEND OTP Endpoint
+app.post('/api/resend-otp', async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required.' });
+
+    const emailLower = email.toLowerCase().trim();
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+    try {
+        let user = null;
+        if (dbType === 'mssql') {
+            const result = await mssqlPool.request()
+                .input('email', sql.NVarChar, emailLower)
+                .query('SELECT * FROM users WHERE email = @email');
+            user = result.recordset[0];
+        } else {
+            user = await new Promise((resolve, reject) => {
+                sqliteDb.get(`SELECT * FROM users WHERE email = ?`, [emailLower], (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                });
+            });
+        }
+
+        if (!user) {
+            return res.status(404).json({ error: 'No account found with this email address.' });
+        }
+
+        if (user.is_verified === 1) {
+            return res.status(400).json({ error: 'This account is already verified. Please sign in.' });
+        }
+
+        if (dbType === 'mssql') {
+            await mssqlPool.request()
+                .input('id', sql.Int, user.id)
+                .input('otp_code', sql.NVarChar, otpCode)
+                .input('otp_expires_at', sql.DateTime, new Date(otpExpiresAt))
+                .query(`UPDATE users SET otp_code = @otp_code, otp_expires_at = @otp_expires_at WHERE id = @id`);
+        } else {
+            await new Promise((resolve, reject) => {
+                sqliteDb.run(
+                    `UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?`,
+                    [otpCode, otpExpiresAt, user.id],
+                    (err) => { if (err) reject(err); else resolve(); }
+                );
+            });
+        }
+
+        try {
+            await sendOtpEmail(emailLower, otpCode, user.name);
+        } catch (emailErr) {
+            console.error('Email resend error:', emailErr.message);
+        }
+
+        return res.status(200).json({ message: 'A new 6-digit verification code has been sent to your email.' });
+    } catch (err) {
+        console.error('Resend OTP error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// SIGN IN Endpoint (Checks verification)
 app.post('/api/signin', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -299,7 +589,33 @@ app.post('/api/signin', async (req, res) => {
             return res.status(401).json({ error: 'Invalid email address or password.' });
         }
 
-        const { password: _, ...userData } = user;
+        // If user account is not verified, trigger OTP send and ask to verify
+        if (user.is_verified === 0) {
+            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+            const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+            if (dbType === 'mssql') {
+                await mssqlPool.request()
+                    .input('id', sql.Int, user.id)
+                    .input('otp_code', sql.NVarChar, otpCode)
+                    .input('otp_expires_at', sql.DateTime, new Date(otpExpiresAt))
+                    .query(`UPDATE users SET otp_code = @otp_code, otp_expires_at = @otp_expires_at WHERE id = @id`);
+            } else {
+                sqliteDb.run(`UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?`, [otpCode, otpExpiresAt, user.id]);
+            }
+
+            try {
+                await sendOtpEmail(emailLower, otpCode, user.name);
+            } catch (e) {}
+
+            return res.status(403).json({
+                error: 'Your email address is not verified yet. We have sent a verification code to your email.',
+                needsVerification: true,
+                email: emailLower
+            });
+        }
+
+        const { password: _, otp_code: __, otp_expires_at: ___, ...userData } = user;
         res.status(200).json({
             message: 'Logged in successfully!',
             user: userData

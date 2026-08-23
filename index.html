@@ -181,6 +181,28 @@
                     </div>
                     <button type="submit" class="submit-btn">Create Account</button>
                 </form>
+
+                <!-- OTP Verification Form Screen -->
+                <div id="otp-form" class="auth-form" style="display:none;">
+                    <div class="otp-header">
+                        <div class="otp-icon-circle">📩</div>
+                        <h3>Verify Your Email</h3>
+                        <p>We've sent a 6-digit verification code to <b id="otp-target-email">user@example.com</b></p>
+                    </div>
+                    <div class="input-group" style="text-align: center;">
+                        <label for="otp-input" style="text-align: center; margin-bottom: 8px;">Enter 6-Digit Code</label>
+                        <input type="text" id="otp-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="• • • • • •" autocomplete="one-time-code" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+                    </div>
+                    <button type="button" class="submit-btn" id="otp-verify-btn" onclick="handleVerifyOtp()">Verify & Continue</button>
+                    <div class="otp-resend-row">
+                        <span>Didn't receive the code?</span>
+                        <button type="button" id="otp-resend-btn" onclick="handleResendOtp()">Resend Code</button>
+                        <span id="otp-timer-text" style="display:none; color: var(--text-muted); font-size: 13px; font-weight: 500;"></span>
+                    </div>
+                    <button type="button" class="otp-back-btn" onclick="backToAuthForm()">
+                        ← Back to Sign In / Sign Up
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -1550,8 +1572,14 @@
             });
         }
 
+        var pendingVerificationEmail = "";
+        var otpTimerInterval = null;
+
         function closeAuthModal() {
             authModalOverlay.classList.remove("active");
+            if (document.getElementById("otp-form").style.display === "block") {
+                backToAuthForm();
+            }
         }
 
         authModalOverlay.onclick = function (e) {
@@ -1591,6 +1619,133 @@
 
             document.getElementById("signin-form").classList.toggle("active", type === 'signin');
             document.getElementById("signup-form").classList.toggle("active", type === 'signup');
+            document.getElementById("signin-form").style.display = type === 'signin' ? 'flex' : 'none';
+            document.getElementById("signup-form").style.display = type === 'signup' ? 'flex' : 'none';
+        }
+
+        function showOtpForm(email) {
+            pendingVerificationEmail = email;
+            document.getElementById("otp-target-email").innerText = email;
+            document.getElementById("signin-form").style.display = "none";
+            document.getElementById("signup-form").style.display = "none";
+            document.querySelector(".role-selector").style.display = "none";
+            document.querySelector(".form-toggle").style.display = "none";
+
+            var otpForm = document.getElementById("otp-form");
+            otpForm.style.display = "block";
+
+            var otpInput = document.getElementById("otp-input");
+            otpInput.value = "";
+            setTimeout(function () { otpInput.focus(); }, 150);
+
+            startOtpCooldown(60);
+        }
+
+        function backToAuthForm() {
+            if (otpTimerInterval) clearInterval(otpTimerInterval);
+            document.getElementById("otp-form").style.display = "none";
+            document.querySelector(".role-selector").style.display = "flex";
+            document.querySelector(".form-toggle").style.display = "flex";
+            setFormType(activeForm);
+        }
+
+        function startOtpCooldown(seconds) {
+            if (otpTimerInterval) clearInterval(otpTimerInterval);
+            var resendBtn = document.getElementById("otp-resend-btn");
+            var timerText = document.getElementById("otp-timer-text");
+
+            resendBtn.style.display = "none";
+            timerText.style.display = "inline";
+            timerText.innerText = "Resend in " + seconds + "s";
+
+            var remaining = seconds;
+            otpTimerInterval = setInterval(function () {
+                remaining--;
+                if (remaining <= 0) {
+                    clearInterval(otpTimerInterval);
+                    timerText.style.display = "none";
+                    resendBtn.style.display = "inline";
+                    resendBtn.disabled = false;
+                    resendBtn.innerText = "Resend Code";
+                } else {
+                    timerText.innerText = "Resend in " + remaining + "s";
+                }
+            }, 1000);
+        }
+
+        function handleVerifyOtp() {
+            var otpInput = document.getElementById("otp-input");
+            var otpCode = otpInput.value.trim();
+            if (otpCode.length !== 6) {
+                alert("Please enter the complete 6-digit verification code.");
+                otpInput.focus();
+                return;
+            }
+
+            var verifyBtn = document.getElementById("otp-verify-btn");
+            var originalText = verifyBtn.innerText;
+            verifyBtn.disabled = true;
+            verifyBtn.innerText = "Verifying...";
+
+            fetch("/api/verify-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: pendingVerificationEmail, otp: otpCode })
+            })
+                .then(function (res) {
+                    return res.json().then(function (data) {
+                        if (!res.ok) throw new Error(data.error || "Verification failed.");
+                        return data;
+                    });
+                })
+                .then(function (data) {
+                    alert(data.message || "Email verified successfully!");
+                    closeAuthModal();
+                    backToAuthForm();
+
+                    if (data.user) {
+                        currentUser = data.user;
+                        localStorage.setItem('polisewa_user', JSON.stringify(data.user));
+                        updateAuthButton();
+                        loadProperties();
+                    }
+                })
+                .catch(function (err) {
+                    alert("Error: " + err.message);
+                    otpInput.focus();
+                })
+                .finally(function () {
+                    verifyBtn.disabled = false;
+                    verifyBtn.innerText = originalText;
+                });
+        }
+
+        function handleResendOtp() {
+            if (!pendingVerificationEmail) return;
+            var resendBtn = document.getElementById("otp-resend-btn");
+            resendBtn.disabled = true;
+            resendBtn.innerText = "Sending...";
+
+            fetch("/api/resend-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: pendingVerificationEmail })
+            })
+                .then(function (res) {
+                    return res.json().then(function (data) {
+                        if (!res.ok) throw new Error(data.error || "Failed to resend code.");
+                        return data;
+                    });
+                })
+                .then(function (data) {
+                    alert(data.message || "New verification code sent!");
+                    startOtpCooldown(60);
+                })
+                .catch(function (err) {
+                    alert("Error: " + err.message);
+                    resendBtn.disabled = false;
+                    resendBtn.innerText = "Resend Code";
+                });
         }
 
         function handleAuthSubmit(event, type) {
@@ -1632,12 +1787,22 @@
                 .then(function (response) {
                     return response.json().then(function (data) {
                         if (!response.ok) {
+                            if (data.needsVerification) {
+                                showOtpForm(data.email || payload.email);
+                                throw new Error(data.error || "Please verify your email address.");
+                            }
                             throw new Error(data.error || "An error occurred.");
                         }
                         return data;
                     });
                 })
                 .then(function (data) {
+                    if (data.needsVerification) {
+                        alert(data.message || "A 6-digit verification code has been sent to your email.");
+                        showOtpForm(data.email || payload.email);
+                        return;
+                    }
+
                     alert(data.message);
                     closeAuthModal();
                     event.target.reset();
@@ -1650,7 +1815,7 @@
                     }
                 })
                 .catch(function (error) {
-                    alert("Error: " + error.message);
+                    alert(error.message);
                 })
                 .finally(function () {
                     submitBtn.disabled = false;
