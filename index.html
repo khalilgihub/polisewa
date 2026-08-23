@@ -28,7 +28,7 @@
     <script src="boundary.js"></script>
 
     <!-- Custom Stylesheet -->
-    <link rel="stylesheet" href="style.css?v=20260823" />
+    <link rel="stylesheet" href="style.css?v=20260823_3" />
 </head>
 
 <body>
@@ -182,26 +182,46 @@
                     <button type="submit" class="submit-btn">Create Account</button>
                 </form>
 
-                <!-- OTP Verification Form Screen -->
+                <!-- OTP Verification Form Screen (Redesigned) -->
                 <div id="otp-form" class="auth-form" style="display:none;">
-                    <div class="otp-header">
-                        <div class="otp-icon-circle">📩</div>
-                        <h3>Verify Your Email</h3>
-                        <p>We've sent a 6-digit verification code to <b id="otp-target-email">user@example.com</b></p>
+                    <div class="otp-card-inner">
+                        <div class="otp-icon-badge">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                <polyline points="22,6 12,13 2,6"></polyline>
+                            </svg>
+                        </div>
+                        <h2 class="otp-modal-title">Verify Your Email</h2>
+                        <p class="otp-modal-sub">
+                            We've sent a 6-digit verification code to<br>
+                            <span id="otp-target-email" class="otp-highlight-email">user@example.com</span>
+                        </p>
+
+                        <div class="otp-input-container">
+                            <label for="otp-input" class="otp-input-label">Enter 6-Digit Code</label>
+                            <input type="text" id="otp-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="• • • • • •" autocomplete="one-time-code" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+                        </div>
+
+                        <button type="button" class="submit-btn" id="otp-verify-btn" onclick="handleVerifyOtp()">Verify & Continue</button>
+
+                        <div class="otp-resend-box">
+                            <span>Didn't receive the code?</span>
+                            <button type="button" id="otp-resend-btn" onclick="handleResendOtp()">Resend Code</button>
+                            <span id="otp-timer-text" style="display:none; font-weight: 600; color: var(--primary);"></span>
+                        </div>
+
+                        <!-- Spam Folder Tip Box -->
+                        <div class="otp-spam-alert">
+                            <div class="otp-spam-alert-icon">💡</div>
+                            <div class="otp-spam-alert-text">
+                                <b>Can't find the email?</b> Check your <u>Spam / Junk</u> folder and click <b>"Report not spam"</b> so future rental notifications arrive directly in your Inbox.
+                            </div>
+                        </div>
+
+                        <button type="button" class="otp-back-link" onclick="backToAuthForm()">
+                            ← Back to Sign In / Sign Up
+                        </button>
                     </div>
-                    <div class="input-group" style="text-align: center;">
-                        <label for="otp-input" style="text-align: center; margin-bottom: 8px;">Enter 6-Digit Code</label>
-                        <input type="text" id="otp-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="• • • • • •" autocomplete="one-time-code" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
-                    </div>
-                    <button type="button" class="submit-btn" id="otp-verify-btn" onclick="handleVerifyOtp()">Verify & Continue</button>
-                    <div class="otp-resend-row">
-                        <span>Didn't receive the code?</span>
-                        <button type="button" id="otp-resend-btn" onclick="handleResendOtp()">Resend Code</button>
-                        <span id="otp-timer-text" style="display:none; color: var(--text-muted); font-size: 13px; font-weight: 500;"></span>
-                    </div>
-                    <button type="button" class="otp-back-btn" onclick="backToAuthForm()">
-                        ← Back to Sign In / Sign Up
-                    </button>
                 </div>
             </div>
         </div>

@@ -38,17 +38,19 @@ async function sendOtpEmail(toEmail, otpCode, userName) {
         <html>
         <head>
             <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; }
-                .container { max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 24px; }
+                .container { max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
                 .header { background: linear-gradient(135deg, #2563eb, #1d4ed8); padding: 32px 24px; text-align: center; color: #ffffff; }
                 .header h1 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
-                .header p { margin: 8px 0 0; font-size: 13.5px; opacity: 0.92; }
+                .header p { margin: 6px 0 0; font-size: 13.5px; opacity: 0.92; }
                 .content { padding: 32px 28px; text-align: center; color: #1e293b; }
                 .greeting { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
                 .text { font-size: 14px; line-height: 1.6; color: #64748b; margin-bottom: 24px; }
-                .otp-box { background: #eff6ff; border: 2px dashed #3b82f6; border-radius: 12px; padding: 16px 24px; display: inline-block; margin: 0 auto 20px; letter-spacing: 8px; font-size: 32px; font-weight: 800; color: #1e40af; font-family: monospace, sans-serif; }
-                .expiry { font-size: 12.5px; color: #94a3b8; margin-bottom: 20px; }
+                .otp-box { background: #eff6ff; border: 2px dashed #3b82f6; border-radius: 12px; padding: 18px 28px; display: inline-block; margin: 0 auto 20px; letter-spacing: 8px; font-size: 34px; font-weight: 800; color: #1e40af; font-family: 'SF Mono', Consolas, Monaco, monospace, sans-serif; }
+                .expiry { font-size: 12.5px; color: #64748b; margin-bottom: 20px; }
+                .spam-tip-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 14px 16px; margin: 24px 0 10px; text-align: left; font-size: 12.5px; color: #92400e; line-height: 1.5; }
                 .footer { border-top: 1px solid #f1f5f9; padding: 20px 24px; font-size: 12px; color: #94a3b8; text-align: center; background: #f8fafc; }
             </style>
         </head>
@@ -60,13 +62,17 @@ async function sendOtpEmail(toEmail, otpCode, userName) {
                 </div>
                 <div class="content">
                     <div class="greeting">Hello ${userName || 'there'},</div>
-                    <div class="text">Thank you for registering on Polisewa. Please use the following 6-digit verification code to activate your account:</div>
+                    <div class="text">Thank you for joining Polisewa. Please use the following 6-digit verification code to activate your account:</div>
                     <div class="otp-box">${otpCode}</div>
-                    <div class="expiry">⏱️ This code will expire in <b>10 minutes</b>. Please do not share this code with anyone.</div>
+                    <div class="expiry">⏱️ This code is valid for <b>10 minutes</b>. Please do not share it with anyone.</div>
+                    
+                    <div class="spam-tip-box">
+                        💡 <b>Delivery Tip:</b> If this email arrived in your <b>Spam or Junk folder</b>, please click <b>"Report not spam"</b> or <b>"Looks safe"</b> at the top of your email client. This automatically trains Google to deliver all future rental inquiries, booking alerts, and account updates straight to your Primary Inbox.
+                    </div>
                 </div>
                 <div class="footer">
-                    If you did not create an account on Polisewa, you can safely ignore this email.<br>
-                    &copy; ${new Date().getFullYear()} Polisewa. Kuching, Sarawak.
+                    If you did not request this verification code, please ignore this email.<br>
+                    &copy; ${new Date().getFullYear()} Polisewa. Politeknik Kuching Sarawak.
                 </div>
             </div>
         </body>
@@ -85,10 +91,11 @@ async function sendOtpEmail(toEmail, otpCode, userName) {
 
     try {
         const info = await transporter.sendMail({
-            from: `"Polisewa" <${emailUser}>`,
+            from: `"Polisewa Support" <${emailUser}>`,
+            replyTo: `"Polisewa Support" <${emailUser}>`,
             to: toEmail,
-            subject: `${otpCode} is your Polisewa Verification Code`,
-            text: `Your Polisewa verification code is: ${otpCode}. It will expire in 10 minutes.`,
+            subject: `Your Polisewa Verification Code: ${otpCode}`,
+            text: `Hello ${userName || 'there'},\n\nYour Polisewa verification code is: ${otpCode}\n\nThis code will expire in 10 minutes.\n\nTip: If this email is in your Spam folder, please mark it as "Not Spam" to receive future rental updates.\n\nBest regards,\nPolisewa Team`,
             html: htmlContent
         });
         console.log(`✅ Verification email sent to ${toEmail} (Message ID: ${info.messageId})`);
