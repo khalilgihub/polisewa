@@ -1,0 +1,235 @@
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1. Prerequisites
+2. Step 1: Create the Azure Virtual Machine
+3. Step 2: Connect to the Server via SSH
+4. Step 3: Install Node.js, Git, PM2, and Build Tools
+5. Step 4: Clone Your Project & Configure Environment (.env)
+6. Step 5: Set Up Process Management with PM2
+7. Step 6: Configure Nginx Reverse Proxy
+8. Step 7: Secure the Domain with Free SSL (Certbot HTTPS)
+9. Step 8: Configure Database Firewall (Whitelisting Server IP)
+10. Step 9: Routine Maintenance & Update Commands
+
+================================================================================
+1. PREREQUISITES
+================================================================================
+- An active Microsoft Azure account (Azure for Students, Free Trial, or Pay-As-You-Go).
+- A domain name (e.g., yourdomain.com) or your Azure VM's Public IP address.
+- A terminal on your local computer (PowerShell, Command Prompt, macOS Terminal, or Linux).
+
+================================================================================
+2. STEP 1: CREATE THE AZURE VIRTUAL MACHINE
+================================================================================
+1. Log in to the Azure Portal: https://portal.azure.com/
+2. In the top search bar, search for "Virtual Machines" and click "Create" -> "Azure virtual machine".
+3. Configure the following options:
+   - Subscription: Select your subscription.
+   - Resource group: Click "Create new" -> name it "<your-resource-group>" (e.g., app-rg).
+   - Virtual machine name: "<your-server-name>" (e.g., app-server).
+   - Region: Select a region closest to your users (e.g., Southeast Asia, East US, etc.).
+   - Availability options: "No infrastructure redundancy required".
+   - Security type: "Standard".
+   - Image: "Ubuntu Server 24.04 LTS - x64 Gen2" (or Ubuntu 22.04 LTS).
+   - Size: "Standard_B1s" (1 vCPU, 1 GB RAM - cost-effective) or "Standard_B1ms" / "Standard_B2s".
+
+4. Administrator Account:
+   - Authentication type: Select "Password" (or SSH Public Key).
+   - Username: Set a username (e.g., azureuser).
+   - Password: Set a strong password (minimum 12 characters with uppercase, lowercase, numbers, and symbols).
+
+5. Inbound Port Rules (Public inbound ports):
+   - Select "Allow selected ports".
+   - Check the following ports:
+     [x] SSH (22)    -> For remote terminal administration
+     [x] HTTP (80)   -> For standard web traffic & SSL issuance
+     [x] HTTPS (443) -> For secure encrypted web traffic
+
+6. Click "Review + create", then click "Create". Wait 1-2 minutes for the deployment to finish.
+
+================================================================================
+3. STEP 2: CONNECT TO THE SERVER VIA SSH
+================================================================================
+1. Open your created Virtual Machine in the Azure Portal.
+2. Copy the "Public IP address" (e.g., 20.198.123.45).
+3. Open PowerShell or Terminal on your computer and run:
+
+   ssh <your-username>@<YOUR_VM_PUBLIC_IP>
+
+   Example:
+   ssh azureuser@20.198.123.45
+
+4. When asked "Are you sure you want to continue connecting (yes/no)?", type "yes" and hit Enter.
+5. Enter your server password when prompted.
+
+================================================================================
+4. STEP 3: INSTALL NODE.JS, GIT, PM2, AND BUILD TOOLS
+================================================================================
+Run the following commands inside the server terminal:
+
+# 1. Update the system package repository and upgrade packages:
+sudo apt update && sudo apt upgrade -y
+
+# 2. Install Node.js LTS (v20) from NodeSource:
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs git build-essential
+
+# 3. Verify Node.js and NPM versions:
+node -v
+npm -v
+
+# 4. Install PM2 globally (Process Manager to keep apps running 24/7):
+sudo npm install -g pm2
+
+================================================================================
+5. STEP 4: CLONE YOUR PROJECT & CONFIGURE ENVIRONMENT (.env)
+================================================================================
+# 1. Clone your project from GitHub/GitLab:
+cd ~
+git clone https://github.com/<your-username>/<your-repository-name>.git
+cd <your-repository-name>
+
+# 2. Install project dependencies:
+npm install --production
+
+# 3. Create your production environment variables file:
+nano .env
+
+# 4. Paste your production environment variables (adjust according to your app):
+PORT=3000
+NODE_ENV=production
+
+# Database Configuration (if applicable)
+DB_SERVER=<your-database-server-host>
+DB_DATABASE=<your-database-name>
+DB_USER=<your-database-user>
+DB_PASSWORD=<your-database-password>
+
+# (To save in nano: Press Ctrl + O, then Enter, then Ctrl + X to exit)
+
+================================================================================
+6. STEP 5: SET UP PROCESS MANAGEMENT WITH PM2
+================================================================================
+PM2 ensures your web application stays running in the background and automatically restarts on system reboots or crashes.
+
+# 1. Start your application:
+pm2 start server.js --name "<your-app-name>"
+
+# 2. Configure PM2 to start automatically when the server boots:
+pm2 startup
+
+# (If PM2 outputs a command starting with 'sudo env PATH...', copy and run it in terminal)
+
+# 3. Save the current process list:
+pm2 save
+
+# 4. Verify running status:
+pm2 status
+pm2 logs <your-app-name> --lines 20
+
+================================================================================
+7. STEP 6: CONFIGURE NGINX REVERSE PROXY
+================================================================================
+Nginx acts as the reverse proxy server that receives public web requests on ports 80/443 and forwards them to your internal Node.js port (e.g., 3000).
+
+# 1. Install Nginx:
+sudo apt install -y nginx
+
+# 2. Create a new Nginx configuration file for your app:
+sudo nano /etc/nginx/sites-available/<your-app-name>
+
+# 3. Paste the following configuration:
+server {
+    listen 80;
+    server_name <your-domain.com> www.<your-domain.com> <YOUR_VM_PUBLIC_IP>;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# (Save with Ctrl + O, Enter, Ctrl + X)
+
+# 4. Enable the configuration and test Nginx:
+sudo ln -s /etc/nginx/sites-available/<your-app-name> /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t
+
+# 5. Restart the Nginx service:
+sudo systemctl restart nginx
+
+================================================================================
+8. STEP 7: SECURE THE DOMAIN WITH FREE SSL (CERTBOT HTTPS)
+================================================================================
+*Note: Make sure you have pointed an "A Record" on your DNS provider (Cloudflare, GoDaddy, Namecheap, etc.) to your Azure VM Public IP.*
+
+# 1. Install Certbot and the Nginx plugin:
+sudo apt install -y certbot python3-certbot-nginx
+
+# 2. Run Certbot to generate and install your free SSL certificate:
+sudo certbot --nginx -d <your-domain.com> -d www.<your-domain.com>
+
+# 3. Complete the interactive prompts:
+- Enter your email address (used for renewal and security notices).
+- Accept the terms of service (type 'Y').
+- Certbot will automatically verify ownership, install the certificate, and configure HTTPS redirection.
+
+================================================================================
+9. STEP 8: CONFIGURE DATABASE FIREWALL (WHITELISTING SERVER IP)
+================================================================================
+If you are using Azure SQL Database, Azure MySQL, or PostgreSQL, incoming connections from external IPs are blocked by default.
+
+1. On your Azure VM terminal, check your server's outbound public IP:
+   curl ifconfig.me
+
+2. Open the Azure Portal:
+   - Go to your Database Server -> under "Security", click "Networking".
+   - Under "Firewall rules", click "Add a firewall rule":
+     * Rule Name: App_Server_VM
+     * Start IP: <Your VM Outbound Public IP>
+     * End IP: <Your VM Outbound Public IP>
+   - Check "Allow Azure services and resources to access this server" (if applicable).
+   - Click "Save".
+
+================================================================================
+10. STEP 9: ROUTINE MAINTENANCE & UPDATE COMMANDS
+================================================================================
+Useful commands for managing and maintaining your server:
+
+1. View running application status:
+   pm2 status
+
+2. View live streaming application logs:
+   pm2 logs <your-app-name>
+
+3. Restart your application:
+   pm2 restart <your-app-name>
+
+4. Pull the latest code updates from Git and redeploy:
+   cd ~/<your-repository-name>
+   git pull origin main
+   npm install --production
+   pm2 restart <your-app-name>
+
+5. Check Nginx status:
+   sudo systemctl status nginx
+
+6. Reload Nginx configuration without downtime:
+   sudo systemctl reload nginx
+
+7. Monitor server CPU, RAM, and disk utilization:
+   htop
+   # (or: free -m  /  df -h)
+
+================================================================================
+END OF TUTORIAL
+================================================================================

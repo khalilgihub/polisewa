@@ -343,11 +343,34 @@ app.get('/api/properties', async (req, res) => {
     }
 });
 
+function hasValidPhotos(image) {
+    if (!image) return false;
+    try {
+        const parsed = typeof image === 'string' ? JSON.parse(image) : image;
+        if (Array.isArray(parsed)) {
+            return parsed.filter(Boolean).length > 0;
+        }
+        if (typeof parsed === 'string') {
+            return parsed.trim().length > 0;
+        }
+    } catch (e) {
+        if (typeof image === 'string') {
+            return image.trim().length > 0;
+        }
+    }
+    return false;
+}
+
 // CREATE PROPERTY (Max 2 per landlord)
 app.post('/api/properties', async (req, res) => {
     const { user_id, name, desc, price, phone, lat, lng, image } = req.body;
-    if (!user_id || !name || lat === undefined || lng === undefined) {
-        return res.status(400).json({ error: 'user_id, name, lat, and lng are required.' });
+    const trimmedName = name ? String(name).trim() : '';
+    const trimmedDesc = desc ? String(desc).trim() : '';
+    const trimmedPrice = price ? String(price).trim() : '';
+    const trimmedPhone = phone ? String(phone).trim() : '';
+
+    if (!user_id || !trimmedName || !trimmedDesc || !trimmedPrice || !trimmedPhone || !hasValidPhotos(image) || lat === undefined || lng === undefined) {
+        return res.status(400).json({ error: 'All fields (Property Name, Description, Monthly Rent, Contact Phone Number, and at least 1 Photo) are mandatory.' });
     }
 
     try {
@@ -361,10 +384,10 @@ app.post('/api/properties', async (req, res) => {
 
             const result = await mssqlPool.request()
                 .input('user_id', sql.Int, user_id)
-                .input('name', sql.NVarChar, name)
-                .input('desc', sql.NVarChar, desc || '')
-                .input('price', sql.NVarChar, price || '')
-                .input('phone', sql.NVarChar, phone || '')
+                .input('name', sql.NVarChar, trimmedName)
+                .input('desc', sql.NVarChar, trimmedDesc)
+                .input('price', sql.NVarChar, trimmedPrice)
+                .input('phone', sql.NVarChar, trimmedPhone)
                 .input('lat', sql.Float, lat)
                 .input('lng', sql.Float, lng)
                 .input('image', sql.NVarChar, image || '')
@@ -383,7 +406,7 @@ app.post('/api/properties', async (req, res) => {
                 }
 
                 const sqlQuery = `INSERT INTO properties (user_id, name, desc, price, phone, lat, lng, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-                sqliteDb.run(sqlQuery, [user_id, name, desc || '', price || '', phone || '', lat, lng, image || ''], function(err2) {
+                sqliteDb.run(sqlQuery, [user_id, trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, lat, lng, image || ''], function(err2) {
                     if (err2) return res.status(500).json({ error: 'Database error: ' + err2.message });
                     res.status(201).json({ id: this.lastID, message: 'Property created.' });
                 });
@@ -399,8 +422,13 @@ app.post('/api/properties', async (req, res) => {
 app.put('/api/properties/:id', async (req, res) => {
     const { id } = req.params;
     const { user_id, name, desc, price, phone, image } = req.body;
-    if (!user_id || !name) {
-        return res.status(400).json({ error: 'user_id and name are required.' });
+    const trimmedName = name ? String(name).trim() : '';
+    const trimmedDesc = desc ? String(desc).trim() : '';
+    const trimmedPrice = price ? String(price).trim() : '';
+    const trimmedPhone = phone ? String(phone).trim() : '';
+
+    if (!user_id || !trimmedName || !trimmedDesc || !trimmedPrice || !trimmedPhone || !hasValidPhotos(image)) {
+        return res.status(400).json({ error: 'All fields (Property Name, Description, Monthly Rent, Contact Phone Number, and at least 1 Photo) are mandatory.' });
     }
 
     try {
@@ -408,10 +436,10 @@ app.put('/api/properties/:id', async (req, res) => {
             const result = await mssqlPool.request()
                 .input('id', sql.Int, id)
                 .input('user_id', sql.Int, user_id)
-                .input('name', sql.NVarChar, name)
-                .input('desc', sql.NVarChar, desc || '')
-                .input('price', sql.NVarChar, price || '')
-                .input('phone', sql.NVarChar, phone || '')
+                .input('name', sql.NVarChar, trimmedName)
+                .input('desc', sql.NVarChar, trimmedDesc)
+                .input('price', sql.NVarChar, trimmedPrice)
+                .input('phone', sql.NVarChar, trimmedPhone)
                 .input('image', sql.NVarChar, image || '')
                 .query(`
                     UPDATE properties
@@ -424,7 +452,7 @@ app.put('/api/properties/:id', async (req, res) => {
             res.status(200).json({ message: 'Property updated.' });
         } else {
             const sqlQuery = `UPDATE properties SET name = ?, desc = ?, price = ?, phone = ?, image = ? WHERE id = ? AND user_id = ?`;
-            sqliteDb.run(sqlQuery, [name, desc || '', price || '', phone || '', image || '', id, user_id], function(err) {
+            sqliteDb.run(sqlQuery, [trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, image || '', id, user_id], function(err) {
                 if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
                 if (this.changes === 0) return res.status(404).json({ error: 'Property not found or not owned by you.' });
                 res.json({ message: 'Property updated.' });

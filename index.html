@@ -72,7 +72,13 @@
             <!-- Floating Search Box -->
             <div id="search-box">
                 <div class="search-input-wrapper">
-                    <input type="text" id="search-input" placeholder="Search places in Kuching..." autocomplete="off" />
+                    <input type="text" id="search-input" placeholder="Search properties or places in Kuching..." autocomplete="off" />
+                    <button id="search-clear-btn" aria-label="Clear search" style="display:none;" onclick="clearSearch()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
                     <button id="search-button" aria-label="Search">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                             stroke-linecap="round" stroke-linejoin="round">
@@ -230,23 +236,23 @@
 
         <form id="property-panel-form" onsubmit="savePropertyFromPanel(event)">
             <div class="input-group">
-                <label for="panel-name">Property / Room Name</label>
+                <label for="panel-name">Property / Room Name <span class="required-star">*</span></label>
                 <input type="text" id="panel-name" required placeholder="Cozy Room near PKS" />
             </div>
             <div class="input-group">
-                <label for="panel-desc">Description</label>
-                <textarea id="panel-desc" rows="3" placeholder="Single room, fully furnished, WiFi included"></textarea>
+                <label for="panel-desc">Description <span class="required-star">*</span></label>
+                <textarea id="panel-desc" rows="3" required placeholder="Single room, fully furnished, WiFi included"></textarea>
             </div>
             <div class="input-group">
-                <label for="panel-price">Monthly Rent (RM)</label>
-                <input type="number" id="panel-price" placeholder="350" min="0" inputmode="numeric" />
+                <label for="panel-price">Monthly Rent (RM) <span class="required-star">*</span></label>
+                <input type="number" id="panel-price" required placeholder="350" min="1" step="any" inputmode="numeric" />
             </div>
             <div class="input-group">
-                <label for="panel-phone">Contact Phone Number</label>
-                <input type="tel" id="panel-phone" placeholder="+60123456789" inputmode="tel" pattern="[0-9+]+" oninput="this.value = this.value.replace(/[^0-9+]/g, '')" />
+                <label for="panel-phone">Contact Phone Number <span class="required-star">*</span></label>
+                <input type="tel" id="panel-phone" required placeholder="+60123456789" inputmode="tel" pattern="[0-9+]+" oninput="this.value = this.value.replace(/[^0-9+]/g, '')" />
             </div>
             <div class="input-group" id="panel-image-group">
-                <label id="panel-image-label">Property Photos (Up to 10)</label>
+                <label id="panel-image-label">Property Photos (0 / 10) <span class="required-star">*</span></label>
                 <!-- Multi-file input for Landlord Uploads -->
                 <input type="file" id="panel-image-input" accept="image/*" multiple hidden onchange="handleImageSelection(event)" />
                 
@@ -558,7 +564,7 @@
             var label = document.getElementById('panel-image-label');
 
             if (mode === 'create' || mode === 'edit') {
-                label.innerText = 'Property Photos (' + pendingImages.length + ' / 10)';
+                label.innerHTML = 'Property Photos (' + pendingImages.length + ' / 10) <span class="required-star">*</span>';
                 editContainer.style.display = 'block';
                 viewContainer.style.display = 'none';
 
@@ -916,6 +922,33 @@
             var desc = document.getElementById('panel-desc').value.trim();
             var price = document.getElementById('panel-price').value.trim();
             var phone = document.getElementById('panel-phone').value.trim();
+
+            if (!name) {
+                alert('Property / Room Name is mandatory and cannot be empty.');
+                document.getElementById('panel-name').focus();
+                return;
+            }
+            if (!desc) {
+                alert('Description is mandatory and cannot be empty.');
+                document.getElementById('panel-desc').focus();
+                return;
+            }
+            if (!price || isNaN(price) || parseFloat(price) <= 0) {
+                alert('Monthly Rent (RM) is mandatory and must be a valid amount greater than 0.');
+                document.getElementById('panel-price').focus();
+                return;
+            }
+            if (!phone) {
+                alert('Contact Phone Number is mandatory and cannot be empty.');
+                document.getElementById('panel-phone').focus();
+                return;
+            }
+            if (!pendingImages || pendingImages.length === 0) {
+                alert('Property Photos are mandatory. Please upload at least 1 photo.');
+                document.getElementById('panel-image-input').click();
+                return;
+            }
+
             var saveBtn = document.getElementById('panel-save-btn');
             var originalText = saveBtn.innerText;
             saveBtn.disabled = true;
@@ -1118,9 +1151,15 @@
             }
         });
 
-        // Keyboard navigation (Escape key to close panel / modals)
+        // Keyboard navigation (Escape key to close panel / modals / search)
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
+                var searchBox = document.getElementById('search-box');
+                var resultsContainer = document.getElementById('search-results');
+                if (resultsContainer && resultsContainer.style.display === 'block') {
+                    resultsContainer.style.display = 'none';
+                    if (searchBox) searchBox.classList.remove('has-results');
+                }
                 var panel = document.getElementById('property-panel');
                 if (panel && panel.classList.contains('active')) {
                     closePropertyPanel();
@@ -1137,74 +1176,216 @@
             }
         });
 
-        // 3. Geocoding Search Function (Strictly localized to Kuching, Sarawak)
-        function performSearch() {
-            var query = document.getElementById("search-input").value.trim();
-            if (!query) return;
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
 
+        var searchDebounceTimer = null;
+
+        function clearSearch() {
+            var searchInput = document.getElementById("search-input");
             var resultsContainer = document.getElementById("search-results");
-            resultsContainer.innerHTML = '<div class="result-feedback">Searching in Kuching...</div>';
-            resultsContainer.style.display = 'block';
+            var searchBox = document.getElementById("search-box");
+            var clearBtn = document.getElementById("search-clear-btn");
+            if (searchInput) searchInput.value = '';
+            if (resultsContainer) {
+                resultsContainer.innerHTML = '';
+                resultsContainer.style.display = 'none';
+            }
+            if (searchBox) searchBox.classList.remove('has-results');
+            if (clearBtn) clearBtn.style.display = 'none';
+        }
 
+        // 3. Unified Search Function (Rental Properties & Kuching Locations)
+        function performSearch() {
+            var searchInput = document.getElementById("search-input");
+            var query = searchInput ? searchInput.value.trim() : '';
+            var resultsContainer = document.getElementById("search-results");
+            var searchBox = document.getElementById("search-box");
+            var clearBtn = document.getElementById("search-clear-btn");
+
+            if (clearBtn) {
+                clearBtn.style.display = query ? 'inline-flex' : 'none';
+            }
+
+            if (!query) {
+                if (resultsContainer) {
+                    resultsContainer.innerHTML = '';
+                    resultsContainer.style.display = 'none';
+                }
+                if (searchBox) searchBox.classList.remove('has-results');
+                return;
+            }
+
+            resultsContainer.innerHTML = '<div class="result-feedback"><span style="display:inline-block; animation:spin 1s linear infinite; margin-right:6px;">🔄</span> Searching properties & places in Kuching...</div>';
+            resultsContainer.style.display = 'block';
+            if (searchBox) searchBox.classList.add('has-results');
+
+            var qLower = query.toLowerCase();
+            var qWords = qLower.split(/\s+/).filter(Boolean);
+
+            // 1. Search registered rental property listings
+            var matchedProperties = (landlordMarkers || []).filter(function(prop) {
+                var name = (prop.name || '').toLowerCase();
+                var desc = (prop.desc || '').toLowerCase();
+                var landlord = (prop.landlord_name || '').toLowerCase();
+                var price = (prop.price ? String(prop.price) : '').toLowerCase();
+
+                if (name.includes(qLower) || desc.includes(qLower) || landlord.includes(qLower) || price.includes(qLower)) {
+                    return true;
+                }
+                // Check if every individual word appears in either name, desc, or landlord
+                if (qWords.length > 1) {
+                    var allWords = qWords.every(function(w) {
+                        return name.includes(w) || desc.includes(w) || landlord.includes(w);
+                    });
+                    if (allWords) return true;
+                }
+                return false;
+            });
+
+            // 2. Search OpenStreetMap Nominatim for Kuching geographical places
             var queryFormatted = query;
             if (!queryFormatted.toLowerCase().includes('kuching')) {
                 queryFormatted += ', Kuching, Sarawak';
             }
 
-            var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(queryFormatted) +
+            var nominatimUrl = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(queryFormatted) +
                 '&countrycodes=my&viewbox=109.80,1.85,110.70,1.15&bounded=1&limit=5';
 
-            fetch(url)
+            fetch(nominatimUrl)
                 .then(function (response) {
                     return response.json();
                 })
                 .then(function (data) {
-                    resultsContainer.innerHTML = '';
-
-                    var localResults = data.filter(function (item) {
+                    var localPlaces = (data || []).filter(function (item) {
                         var lat = parseFloat(item.lat);
                         var lon = parseFloat(item.lon);
                         return isInsideKuchingBoundary(lat, lon);
                     });
 
-                    if (localResults.length === 0) {
-                        resultsContainer.innerHTML = '<div class="result-feedback result-empty">No locations found in Kuching. Try "Matang", "Satok", or "Politeknik".</div>';
-                        return;
-                    }
-
-                    localResults.forEach(function (item) {
-                        var div = document.createElement('div');
-                        div.className = 'result-item';
-                        div.innerText = item.display_name;
-
-                        div.onclick = function () {
-                            var lat = parseFloat(item.lat);
-                            var lon = parseFloat(item.lon);
-
-                            map.flyTo([lat, lon], 16, { animate: true, duration: 1.0 });
-
-                            if (currentMarker) {
-                                map.removeLayer(currentMarker);
-                            }
-
-                            currentMarker = L.marker([lat, lon]).addTo(map);
-                            var nameOnly = item.display_name.split(',')[0];
-                            currentMarker.bindPopup("<b>" + nameOnly + "</b><br>" + item.display_name).openPopup();
-
-                            currentMarker.on('click', function (e) {
-                                map.flyTo(e.latlng, 16);
-                            });
-
-                            resultsContainer.style.display = 'none';
-                            document.getElementById("search-input").value = nameOnly;
-                        };
-                        resultsContainer.appendChild(div);
-                    });
+                    renderSearchResults(query, matchedProperties, localPlaces);
                 })
                 .catch(function (error) {
-                    console.error('Search error:', error);
-                    resultsContainer.innerHTML = '<div class="result-feedback result-error">Error fetching search results.</div>';
+                    console.error('Search geocoding error:', error);
+                    // Still render property matches even if geocoding failed or offline
+                    renderSearchResults(query, matchedProperties, []);
                 });
+        }
+
+        function renderSearchResults(query, properties, places) {
+            var resultsContainer = document.getElementById("search-results");
+            var searchBox = document.getElementById("search-box");
+            if (!resultsContainer) return;
+
+            resultsContainer.innerHTML = '';
+
+            var totalCount = properties.length + places.length;
+            if (totalCount === 0) {
+                var emptyDiv = document.createElement('div');
+                emptyDiv.className = 'result-feedback result-empty';
+                emptyDiv.innerHTML = '<div style="font-weight:600; margin-bottom:4px; color:#1e293b;">No results found</div>' +
+                    '<div style="font-size:12.5px; color:#64748b;">No properties or locations match "<b>' + escapeHtml(query) + '</b>" in Kuching.</div>';
+                resultsContainer.appendChild(emptyDiv);
+                return;
+            }
+
+            // Render Property Listings Group
+            if (properties.length > 0) {
+                var propHeader = document.createElement('div');
+                propHeader.className = 'search-category-header';
+                propHeader.innerHTML = '<span>🏠 Rental Properties (' + properties.length + ')</span>';
+                resultsContainer.appendChild(propHeader);
+
+                properties.forEach(function(prop) {
+                    var div = document.createElement('div');
+                    div.className = 'result-item';
+
+                    var priceTag = prop.price ? '<span class="result-price-badge">RM ' + escapeHtml(prop.price) + '/mo</span>' : '';
+                    var descSnippet = prop.desc ? escapeHtml(prop.desc) : 'No description';
+                    var landlordTag = prop.landlord_name ? ' • 🔑 ' + escapeHtml(prop.landlord_name) : '';
+
+                    div.innerHTML = '<div class="result-icon">🏠</div>' +
+                        '<div class="result-text">' +
+                            '<div class="result-title">' +
+                                '<span class="result-name">' + escapeHtml(prop.name || 'Rental Property') + '</span>' +
+                                priceTag +
+                            '</div>' +
+                            '<div class="result-sub">' + descSnippet + landlordTag + '</div>' +
+                        '</div>';
+
+                    div.onclick = function() {
+                        map.flyTo([prop.lat, prop.lng], 16, { animate: true, duration: 1.0 });
+                        resultsContainer.style.display = 'none';
+                        if (searchBox) searchBox.classList.remove('has-results');
+                        document.getElementById("search-input").value = prop.name || '';
+                        var clearBtn = document.getElementById("search-clear-btn");
+                        if (clearBtn) clearBtn.style.display = 'inline-flex';
+
+                        setTimeout(function() {
+                            if (prop.marker) {
+                                prop.marker.openPopup();
+                            }
+                        }, 450);
+                    };
+
+                    resultsContainer.appendChild(div);
+                });
+            }
+
+            // Render Kuching Places Group
+            if (places.length > 0) {
+                var placeHeader = document.createElement('div');
+                placeHeader.className = 'search-category-header';
+                placeHeader.innerHTML = '<span>📍 Kuching Locations (' + places.length + ')</span>';
+                resultsContainer.appendChild(placeHeader);
+
+                places.forEach(function(item) {
+                    var div = document.createElement('div');
+                    div.className = 'result-item';
+                    var nameOnly = (item.display_name || '').split(',')[0];
+
+                    div.innerHTML = '<div class="result-icon">📍</div>' +
+                        '<div class="result-text">' +
+                            '<div class="result-title">' +
+                                '<span class="result-name">' + escapeHtml(nameOnly) + '</span>' +
+                            '</div>' +
+                            '<div class="result-sub">' + escapeHtml(item.display_name || '') + '</div>' +
+                        '</div>';
+
+                    div.onclick = function() {
+                        var lat = parseFloat(item.lat);
+                        var lon = parseFloat(item.lon);
+
+                        map.flyTo([lat, lon], 16, { animate: true, duration: 1.0 });
+
+                        if (currentMarker) {
+                            map.removeLayer(currentMarker);
+                        }
+
+                        currentMarker = L.marker([lat, lon]).addTo(map);
+                        currentMarker.bindPopup("<b>" + escapeHtml(nameOnly) + "</b><br>" + escapeHtml(item.display_name)).openPopup();
+
+                        currentMarker.on('click', function (e) {
+                            map.flyTo(e.latlng, 16);
+                        });
+
+                        resultsContainer.style.display = 'none';
+                        if (searchBox) searchBox.classList.remove('has-results');
+                        document.getElementById("search-input").value = nameOnly;
+                        var clearBtn = document.getElementById("search-clear-btn");
+                        if (clearBtn) clearBtn.style.display = 'inline-flex';
+                    };
+
+                    resultsContainer.appendChild(div);
+                });
+            }
         }
 
         // Attach Event Listeners
@@ -1212,9 +1393,32 @@
 
         document.getElementById("search-input").onkeydown = function (e) {
             if (e.key === 'Enter') {
+                clearTimeout(searchDebounceTimer);
                 performSearch();
             }
         };
+
+        document.getElementById("search-input").addEventListener('input', function() {
+            var val = this.value.trim();
+            var clearBtn = document.getElementById("search-clear-btn");
+            if (clearBtn) clearBtn.style.display = val ? 'inline-flex' : 'none';
+
+            clearTimeout(searchDebounceTimer);
+            if (!val) {
+                var resultsContainer = document.getElementById("search-results");
+                var searchBox = document.getElementById("search-box");
+                if (resultsContainer) {
+                    resultsContainer.innerHTML = '';
+                    resultsContainer.style.display = 'none';
+                }
+                if (searchBox) searchBox.classList.remove('has-results');
+                return;
+            }
+
+            searchDebounceTimer = setTimeout(function() {
+                performSearch();
+            }, 250);
+        });
 
         // Close dropdown when clicking outside
         document.addEventListener('click', function (e) {
@@ -1222,6 +1426,7 @@
             var resultsContainer = document.getElementById("search-results");
             if (searchBox && !searchBox.contains(e.target)) {
                 resultsContainer.style.display = 'none';
+                searchBox.classList.remove('has-results');
             }
             if (authDropdown && !authDropdown.contains(e.target) && e.target !== authBtn && !authBtn.contains(e.target)) {
                 authDropdown.classList.remove('active');
