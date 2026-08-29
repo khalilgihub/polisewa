@@ -1349,6 +1349,7 @@ app.delete('/api/user', async (req, res) => {
                 .query('SELECT * FROM users WHERE id = @user_id');
             const user = userRes.recordset[0];
             if (!user) return res.status(404).json({ error: 'User not found.' });
+            if (user.role === 'admin') return res.status(403).json({ error: 'Administrator accounts cannot be deleted.' });
 
             const isMatch = await bcrypt.compare(password, user.password);
             if (!isMatch) return res.status(401).json({ error: 'Incorrect password.' });
@@ -1385,6 +1386,7 @@ app.delete('/api/user', async (req, res) => {
             sqliteDb.get(`SELECT * FROM users WHERE id = ?`, [user_id], async (err, user) => {
                 if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
                 if (!user) return res.status(404).json({ error: 'User not found.' });
+                if (user.role === 'admin') return res.status(403).json({ error: 'Administrator accounts cannot be deleted.' });
 
                 try {
                     const isMatch = await bcrypt.compare(password, user.password);

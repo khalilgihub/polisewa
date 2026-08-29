@@ -64,8 +64,8 @@
                         </svg>
                         Log Out
                     </button>
-                    <div class="auth-dropdown-divider"></div>
-                    <button class="auth-dropdown-item auth-dropdown-danger" onclick="openDeleteAccountModal()">
+                    <div class="auth-dropdown-divider" id="auth-delete-divider"></div>
+                    <button class="auth-dropdown-item auth-dropdown-danger" id="auth-delete-btn" onclick="openDeleteAccountModal()">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -797,7 +797,9 @@
                 .then(function(res) { return res.json(); })
                 .then(function(properties) {
                     for (var i = 0; i < landlordMarkers.length; i++) {
-                        map.removeLayer(landlordMarkers[i].marker);
+                        if (landlordMarkers[i] && landlordMarkers[i].marker) {
+                            map.removeLayer(landlordMarkers[i].marker);
+                        }
                     }
                     landlordMarkers = [];
 
@@ -821,11 +823,20 @@
                         var index = landlordMarkers.length;
                         landlordMarkers.push(propertyData);
                         marker.bindPopup(createMarkerPopup(index));
-                        marker.on('click', (function(idx) {
-                            return function(e) {
+                        
+                        (function(m, idx) {
+                            m.on('click', function(e) {
+                                if (pendingMarker) {
+                                    map.removeLayer(pendingMarker);
+                                    pendingMarker = null;
+                                }
+                                if (panelMode === 'create') {
+                                    closePropertyPanel();
+                                }
                                 map.panTo(e.latlng, { animate: true });
-                            };
-                        })(index));
+                                m.openPopup();
+                            });
+                        })(marker, index);
                     }
                 })
                 .catch(function(err) {
@@ -838,19 +849,14 @@
         function rebuildAllPopups() {
             for (var i = 0; i < landlordMarkers.length; i++) {
                 var item = landlordMarkers[i];
-                item.marker.unbindPopup();
-                item.marker.bindPopup(createMarkerPopup(i));
-                item.marker.off('click');
-                item.marker.on('click', (function(idx) {
-                    return function(e) {
-                        map.panTo(e.latlng, { animate: true });
-                    };
-                })(idx_bind(i)));
+                if (!item || !item.marker) continue;
+                var newContent = createMarkerPopup(i);
+                if (item.marker.getPopup()) {
+                    item.marker.setPopupContent(newContent);
+                } else {
+                    item.marker.bindPopup(newContent);
+                }
             }
-        }
-
-        function idx_bind(i) {
-            return function(e) { map.panTo(e.latlng, { animate: true }); };
         }
 
         function createMarkerPopup(index) {
@@ -870,7 +876,7 @@
             var actionsHtml = '';
             if (isAdmin) {
                 actionsHtml = "<div style='margin-top:10px;display:flex;flex-direction:column;gap:6px;'>" +
-                    "<button class='admin-verify-btn " + (isVerified ? "btn-unverify" : "btn-verify") + "'>" +
+                    "<button class='admin-verify-btn " + (isVerified ? "btn-unverify" : "btn-verify") + "' id='popup-verify-btn-" + data.id + "'>" +
                         (isVerified ? "🛡️ Revoke Verification" : "✅ Verify Listing") +
                     "</button>" +
                     "<div style='display:flex;gap:6px;'>" +
@@ -908,7 +914,7 @@
             if (verifyBtn) {
                 verifyBtn.onclick = function(e) {
                     e.stopPropagation();
-                    togglePropertyVerification(data.id, index);
+                    togglePropertyVerification(data.id, index, verifyBtn);
                 };
             }
             var editBtn = popupContent.querySelector('.edit-pin-btn');
@@ -959,26 +965,51 @@
             return popupContent;
         }
 
-        function togglePropertyVerification(propId, markerIndex) {
+        function togglePropertyVerification(propId, markerIndex, clickedBtn) {
             if (!currentUser || currentUser.role !== 'admin') return;
             var target = null;
+            var targetIdx = -1;
+
             if (markerIndex !== undefined && markerIndex >= 0 && landlordMarkers[markerIndex]) {
                 target = landlordMarkers[markerIndex];
+                targetIdx = markerIndex;
             } else {
-                target = landlordMarkers.find(function(m) { return m.id === propId; });
+                for (var k = 0; k < landlordMarkers.length; k++) {
+                    if (landlordMarkers[k].id === propId) {
+                        target = landlordMarkers[k];
+                        targetIdx = k;
+                        break;
+                    }
+                }
             }
             if (!target) return;
 
             var newStatus = target.is_verified === 1 ? 0 : 1;
+            if (clickedBtn) {
+                clickedBtn.disabled = true;
+                clickedBtn.innerText = 'Updating...';
+            }
+
             fetch('/api/properties/' + propId + '/verify', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ admin_id: currentUser.id, is_verified: newStatus })
             })
             .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
-            .then(function() {
+            .then(function(data) {
                 target.is_verified = newStatus;
+
+                // Immediately update live popup content without closing
+                if (target.marker) {
+                    var newPopup = createMarkerPopup(targetIdx);
+                    target.marker.setPopupContent(newPopup);
+                    if (!target.marker.isPopupOpen()) {
+                        target.marker.openPopup();
+                    }
+                }
+
                 rebuildAllPopups();
+
                 if (panelMode === 'view' && editingMarkerIndex >= 0 && landlordMarkers[editingMarkerIndex] && landlordMarkers[editingMarkerIndex].id === propId) {
                     openPropertyPanel('view', editingMarkerIndex);
                 }
@@ -988,6 +1019,10 @@
             })
             .catch(function(err) {
                 alert('Verification error: ' + err.message);
+                if (clickedBtn) {
+                    clickedBtn.disabled = false;
+                    clickedBtn.innerText = target.is_verified === 1 ? '🛡️ Revoke Verification' : '✅ Verify Listing';
+                }
             });
         }
 
@@ -1047,6 +1082,11 @@
 
         function openPropertyPanel(mode, index) {
             panelMode = mode;
+            if (mode !== 'create' && pendingMarker) {
+                map.removeLayer(pendingMarker);
+                pendingMarker = null;
+                pendingLatLng = null;
+            }
             var panel = document.getElementById('property-panel');
             var title = document.getElementById('panel-title-text');
             var saveBtn = document.getElementById('panel-save-btn');
@@ -1377,24 +1417,22 @@
             }
         }
 
-        // Landlord / Admin click on map to drop pin and open panel
+        // Landlord click on map to drop pin and open panel
         map.on('click', function(e) {
-            if (currentUser && (currentUser.role === 'landlord' || currentUser.role === 'admin')) {
+            if (currentUser && currentUser.role === 'landlord') {
                 if (!isInsideKuchingBoundary(e.latlng.lat, e.latlng.lng)) {
                     alert("Please select a location inside the orange Kuching boundary line.");
                     return;
                 }
-                if (currentUser.role !== 'admin') {
-                    var myCount = 0;
-                    for (var i = 0; i < landlordMarkers.length; i++) {
-                        if (landlordMarkers[i].user_id === currentUser.id) {
-                            myCount++;
-                        }
+                var myCount = 0;
+                for (var i = 0; i < landlordMarkers.length; i++) {
+                    if (landlordMarkers[i].user_id === currentUser.id) {
+                        myCount++;
                     }
-                    if (myCount >= 2) {
-                        alert("You can only add up to 2 property pinpoints.");
-                        return;
-                    }
+                }
+                if (myCount >= 2) {
+                    alert("You can only add up to 2 property pinpoints.");
+                    return;
                 }
                 pendingLatLng = e.latlng;
 
@@ -1405,6 +1443,12 @@
                 pendingMarker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(map);
 
                 openPropertyPanel('create');
+            } else {
+                // If not landlord, clear any orphaned pending marker
+                if (pendingMarker) {
+                    map.removeLayer(pendingMarker);
+                    pendingMarker = null;
+                }
             }
         });
 
@@ -1730,9 +1774,13 @@
 
         function updateAuthButton() {
             var adminBtn = document.getElementById("auth-admin-btn");
+            var deleteBtn = document.getElementById("auth-delete-btn");
+            var deleteDivider = document.getElementById("auth-delete-divider");
+
             if (currentUser) {
-                var roleIcon = currentUser.role === 'admin' ? '🛡️' : (currentUser.role === 'student' ? '🎓' : '🔑');
-                var displayName = currentUser.role === 'admin' ? 'Admin ' + currentUser.name.split(' ')[0] : 'Hello, ' + currentUser.name.split(' ')[0];
+                var isAdmin = currentUser.role === 'admin';
+                var roleIcon = isAdmin ? '🛡️' : (currentUser.role === 'student' ? '🎓' : '🔑');
+                var displayName = isAdmin ? 'Admin ' + currentUser.name.split(' ')[0] : 'Hello, ' + currentUser.name.split(' ')[0];
                 authBtn.innerHTML = `
                     <span class="auth-role-badge">${roleIcon}</span>
                     <span class="auth-btn-text">${displayName}</span>
@@ -1741,7 +1789,13 @@
                     </svg>
                 `;
                 if (adminBtn) {
-                    adminBtn.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+                    adminBtn.style.display = isAdmin ? 'flex' : 'none';
+                }
+                if (deleteBtn) {
+                    deleteBtn.style.display = isAdmin ? 'none' : 'flex';
+                }
+                if (deleteDivider) {
+                    deleteDivider.style.display = isAdmin ? 'none' : 'block';
                 }
             } else {
                 authBtn.innerHTML = `
@@ -1753,6 +1807,8 @@
                 `;
                 authDropdown.classList.remove('active');
                 if (adminBtn) adminBtn.style.display = 'none';
+                if (deleteBtn) deleteBtn.style.display = 'flex';
+                if (deleteDivider) deleteDivider.style.display = 'block';
             }
         }
 
