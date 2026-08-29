@@ -274,6 +274,7 @@ async function seedAdminAccounts() {
                             [admin.name, hashedPassword, admin.role, admin.extra, emailLower],
                             (updateErr) => {
                                 if (updateErr) console.error(`Error updating admin ${emailLower}:`, updateErr.message);
+                                else console.log(`🛡️ Updated existing administrator account: ${emailLower}`);
                             }
                         );
                     }
