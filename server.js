@@ -196,7 +196,7 @@ const DEFAULT_ADMINS = [
         name: 'Abdul Khalil (Admin)',
         email: 'abdulkhalilpro@gmail.com',
         password: 'poli@sewaadministrator',
-        phone: '+60123456789',
+        phone: '01126202974',
         role: 'admin',
         extra: 'System Administrator'
     },
@@ -204,7 +204,7 @@ const DEFAULT_ADMINS = [
         name: 'Asyarif (Admin)',
         email: 'asyarif3005@gmail.com',
         password: '011poliadministrator123',
-        phone: '+60123456789',
+        phone: '0167190535',
         role: 'admin',
         extra: 'System Administrator'
     },
@@ -212,7 +212,7 @@ const DEFAULT_ADMINS = [
         name: 'Josh Alzon (Admin)',
         email: 'joshalzon981@gmail.com',
         password: 'joshadministrator*123@!',
-        phone: '+60123456789',
+        phone: '0132196467',
         role: 'admin',
         extra: 'System Administrator'
     }
@@ -245,13 +245,15 @@ async function seedAdminAccounts() {
                     await mssqlPool.request()
                         .input('email', sql.NVarChar, emailLower)
                         .input('name', sql.NVarChar, admin.name)
+                        .input('phone', sql.NVarChar, admin.phone)
                         .input('password', sql.NVarChar, hashedPassword)
                         .input('role', sql.NVarChar, admin.role)
                         .input('extra', sql.NVarChar, admin.extra)
                         .query(`
-                            UPDATE users SET name = @name, password = @password, role = @role, extra = @extra, is_verified = 1
+                            UPDATE users SET name = @name, phone = @phone, password = @password, role = @role, extra = @extra, is_verified = 1
                             WHERE email = @email
                         `);
+                    console.log(`🛡️ Updated existing administrator account: ${emailLower}`);
                 }
             } else if (sqliteDb) {
                 sqliteDb.get(`SELECT id FROM users WHERE email = ?`, [emailLower], (err, row) => {
@@ -270,8 +272,8 @@ async function seedAdminAccounts() {
                         );
                     } else {
                         sqliteDb.run(
-                            `UPDATE users SET name = ?, password = ?, role = ?, extra = ?, is_verified = 1 WHERE email = ?`,
-                            [admin.name, hashedPassword, admin.role, admin.extra, emailLower],
+                            `UPDATE users SET name = ?, phone = ?, password = ?, role = ?, extra = ?, is_verified = 1 WHERE email = ?`,
+                            [admin.name, admin.phone, hashedPassword, admin.role, admin.extra, emailLower],
                             (updateErr) => {
                                 if (updateErr) console.error(`Error updating admin ${emailLower}:`, updateErr.message);
                                 else console.log(`🛡️ Updated existing administrator account: ${emailLower}`);
