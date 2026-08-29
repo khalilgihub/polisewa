@@ -870,14 +870,14 @@
             popupContent.style.minWidth = '230px';
 
             var verifiedBadgeHtml = isVerified
-                ? "<div class='popup-verified-badge'><svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'></path><polyline points='9 12 11 14 15 10'></polyline></svg> Polisewa Verified</div>"
+                ? "<div class='popup-verified-badge'><svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'></polyline></svg> Polisewa Verified</div>"
                 : "";
 
             var actionsHtml = '';
             if (isAdmin) {
                 actionsHtml = "<div style='margin-top:10px;display:flex;flex-direction:column;gap:6px;'>" +
                     "<button class='admin-verify-btn " + (isVerified ? "btn-unverify" : "btn-verify") + "' id='popup-verify-btn-" + data.id + "'>" +
-                        (isVerified ? "🛡️ Revoke Verification" : "✅ Verify Listing") +
+                        (isVerified ? "✕ Revoke Verification" : "✓ Verify Listing") +
                     "</button>" +
                     "<div style='display:flex;gap:6px;'>" +
                         "<button class='edit-pin-btn' style='flex:1;padding:6px 10px;font-size:11.5px;font-weight:600;cursor:pointer;background:#2563eb;color:white;border:none;border-radius:8px;'>Edit</button>" +
@@ -1162,7 +1162,7 @@
                 phoneInput.disabled = true;
                 var infoHtml = '<div class="landlord-view-card">';
                 if (data.is_verified === 1) {
-                    infoHtml += '<div class="panel-verified-banner"><span class="banner-badge">🛡️ Polisewa Verified</span><span class="banner-sub">Officially reviewed by platform admin</span></div>';
+                    infoHtml += '<div class="panel-verified-banner"><span class="banner-badge"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Polisewa Verified</span><span class="banner-sub">Inspected & Verified by Admin</span></div>';
                 }
                 if (data.landlord_name) {
                     infoHtml += '<div class="landlord-view-header"><span class="landlord-badge">🔑 Landlord</span> <span class="landlord-name">' + data.landlord_name + '</span></div>';
@@ -1611,7 +1611,7 @@
                     var div = document.createElement('div');
                     div.className = 'result-item';
 
-                    var verifiedTag = prop.is_verified === 1 ? '<span class="result-verified-badge">🛡️ Verified</span>' : '';
+                    var verifiedTag = prop.is_verified === 1 ? '<span class="result-verified-badge"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Verified</span>' : '';
                     var priceTag = prop.price ? '<span class="result-price-badge">RM ' + escapeHtml(prop.price) + '/mo</span>' : '';
                     var descSnippet = prop.desc ? escapeHtml(prop.desc) : 'No description';
                     var landlordTag = prop.landlord_name ? ' • 🔑 ' + escapeHtml(prop.landlord_name) : '';
@@ -2334,7 +2334,7 @@
                     '<td><span class="admin-price-badge">RM ' + escapeHtml(p.price || '0') + '/mo</span></td>' +
                     '<td>' +
                         '<button class="admin-status-toggle ' + (isVer ? 'status-verified' : 'status-unverified') + '" onclick="adminTogglePropertyVerify(' + p.id + ', ' + (isVer ? 1 : 0) + ')">' +
-                            (isVer ? '✅ Verified' : '⏳ Unverified') +
+                            (isVer ? '✓ Verified' : '⏳ Unverified') +
                         '</button>' +
                     '</td>' +
                     '<td style="text-align:right;">' +
