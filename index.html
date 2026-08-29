@@ -50,6 +50,12 @@
                 <!-- Auth Dropdown Menu (visible when logged in) -->
                 <div id="auth-dropdown" class="auth-dropdown">
                     <div class="auth-dropdown-header">Account</div>
+                    <button class="auth-dropdown-item auth-dropdown-admin" id="auth-admin-btn" style="display:none;" onclick="openAdminDashboardModal()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                        Admin Dashboard
+                    </button>
                     <button class="auth-dropdown-item" onclick="handleLogout()">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -249,6 +255,130 @@
                 <div class="modal-actions-row">
                     <button type="button" class="submit-btn submit-btn-secondary" onclick="closeDeleteAccountModal()">Cancel</button>
                     <button type="button" class="submit-btn submit-btn-danger" id="delete-confirm-btn" onclick="handleDeleteAccount()">Delete Forever</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard Modal Overlay -->
+        <div id="admin-modal-overlay" class="modal-overlay">
+            <div id="admin-modal" class="modal-card modal-card-lg">
+                <button class="close-btn" onclick="closeAdminDashboardModal()" aria-label="Close">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                <div class="modal-header admin-modal-header">
+                    <div class="admin-header-title-row">
+                        <span class="admin-shield-icon">🛡️</span>
+                        <div>
+                            <h2>Polisewa Admin Console</h2>
+                            <p>Verify property listings, moderate accommodation pins, and manage accounts</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Analytics Stats Row -->
+                <div class="admin-stats-grid">
+                    <div class="admin-stat-card">
+                        <div class="stat-icon">🏠</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="admin-stat-properties">0</div>
+                            <div class="stat-label">Total Listings</div>
+                        </div>
+                    </div>
+                    <div class="admin-stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="admin-stat-verified">0</div>
+                            <div class="stat-label">Verified Listings</div>
+                        </div>
+                    </div>
+                    <div class="admin-stat-card">
+                        <div class="stat-icon">🔑</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="admin-stat-landlords">0</div>
+                            <div class="stat-label">Landlords</div>
+                        </div>
+                    </div>
+                    <div class="admin-stat-card">
+                        <div class="stat-icon">🎓</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="admin-stat-students">0</div>
+                            <div class="stat-label">Students</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Tabs -->
+                <div class="admin-tabs">
+                    <button class="admin-tab active" id="tab-btn-properties" onclick="switchAdminTab('properties')">🏠 Properties (<span id="admin-count-props">0</span>)</button>
+                    <button class="admin-tab" id="tab-btn-users" onclick="switchAdminTab('users')">👥 User Accounts (<span id="admin-count-users">0</span>)</button>
+                </div>
+
+                <!-- Tab 1: Properties Management -->
+                <div id="admin-tab-properties" class="admin-tab-content active">
+                    <div class="admin-filters-row">
+                        <div class="admin-search-wrapper">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="text" id="admin-prop-search" placeholder="Search property name or landlord..." oninput="filterAdminProperties()" />
+                        </div>
+                        <select id="admin-prop-filter" onchange="filterAdminProperties()" class="admin-select">
+                            <option value="all">All Listings</option>
+                            <option value="verified">✅ Verified Only</option>
+                            <option value="unverified">⏳ Unverified Only</option>
+                        </select>
+                    </div>
+
+                    <div class="admin-table-container">
+                        <table class="admin-table" id="admin-properties-table">
+                            <thead>
+                                <tr>
+                                    <th>Property</th>
+                                    <th>Landlord</th>
+                                    <th>Price</th>
+                                    <th>Status</th>
+                                    <th style="text-align:right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-properties-tbody">
+                                <tr><td colspan="5" class="admin-table-empty">Loading listings...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Users Management -->
+                <div id="admin-tab-users" class="admin-tab-content" style="display:none;">
+                    <div class="admin-filters-row">
+                        <div class="admin-search-wrapper">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="text" id="admin-user-search" placeholder="Search user by name, email, or phone..." oninput="filterAdminUsers()" />
+                        </div>
+                        <select id="admin-user-filter" onchange="filterAdminUsers()" class="admin-select">
+                            <option value="all">All Roles</option>
+                            <option value="student">🎓 Students Only</option>
+                            <option value="landlord">🔑 Landlords Only</option>
+                            <option value="admin">🛡️ Admins Only</option>
+                        </select>
+                    </div>
+
+                    <div class="admin-table-container">
+                        <table class="admin-table" id="admin-users-table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Role</th>
+                                    <th>Email Verification</th>
+                                    <th>Listings</th>
+                                    <th style="text-align:right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-users-tbody">
+                                <tr><td colspan="5" class="admin-table-empty">Loading users...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -683,6 +813,7 @@
                             price: prop.price,
                             phone: prop.phone,
                             landlord_name: prop.landlord_name,
+                            is_verified: prop.is_verified || 0,
                             lat: prop.lat,
                             lng: prop.lng,
                             image: prop.image || ''
@@ -714,19 +845,41 @@
                     return function(e) {
                         map.panTo(e.latlng, { animate: true });
                     };
-                })(i));
+                })(idx_bind(i)));
             }
+        }
+
+        function idx_bind(i) {
+            return function(e) { map.panTo(e.latlng, { animate: true }); };
         }
 
         function createMarkerPopup(index) {
             var data = landlordMarkers[index];
             if (!data) return document.createElement('div');
             var isOwner = currentUser && currentUser.id === data.user_id;
+            var isAdmin = currentUser && currentUser.role === 'admin';
+            var isVerified = data.is_verified === 1;
+
             var popupContent = document.createElement('div');
-            popupContent.style.minWidth = '220px';
+            popupContent.style.minWidth = '230px';
+
+            var verifiedBadgeHtml = isVerified
+                ? "<div class='popup-verified-badge'><svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'></path><polyline points='9 12 11 14 15 10'></polyline></svg> Polisewa Verified</div>"
+                : "";
 
             var actionsHtml = '';
-            if (isOwner) {
+            if (isAdmin) {
+                actionsHtml = "<div style='margin-top:10px;display:flex;flex-direction:column;gap:6px;'>" +
+                    "<button class='admin-verify-btn " + (isVerified ? "btn-unverify" : "btn-verify") + "'>" +
+                        (isVerified ? "🛡️ Revoke Verification" : "✅ Verify Listing") +
+                    "</button>" +
+                    "<div style='display:flex;gap:6px;'>" +
+                        "<button class='edit-pin-btn' style='flex:1;padding:6px 10px;font-size:11.5px;font-weight:600;cursor:pointer;background:#2563eb;color:white;border:none;border-radius:8px;'>Edit</button>" +
+                        "<button class='view-pin-btn' style='flex:1;padding:6px 10px;font-size:11.5px;font-weight:600;cursor:pointer;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;'>Details</button>" +
+                        "<button class='remove-pin-btn' style='padding:6px 10px;font-size:11.5px;font-weight:600;cursor:pointer;background:#fee2e2;color:#ef4444;border:none;border-radius:8px;'>Delete</button>" +
+                    "</div>" +
+                    "</div>";
+            } else if (isOwner) {
                 actionsHtml = "<div style='margin-top:10px;display:flex;gap:8px;'>" +
                     "<button class='edit-pin-btn' style='flex:1;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#2563eb;color:white;border:none;border-radius:8px;box-shadow:0 2px 6px rgba(37,99,235,0.3);'>Edit Listing</button>" +
                     "<button class='remove-pin-btn' style='padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#fee2e2;color:#ef4444;border:none;border-radius:8px;'>Delete</button>" +
@@ -744,58 +897,98 @@
             var imageHtml = buildGalleryHtml(imageUrls, 'popup-gallery-' + index, true);
 
             popupContent.innerHTML = imageHtml +
+                verifiedBadgeHtml +
                 "<div style='font-size:16px;font-weight:700;color:#0f172a;margin-bottom:3px;'>" + (data.name || 'Property') + "</div>" +
                 (data.desc ? "<div style='font-size:12px;color:#64748b;margin-bottom:6px;line-height:1.4;'>" + data.desc + "</div>" : "") +
                 (data.price ? "<div style='color:#2563eb;font-weight:700;font-size:15px;margin-bottom:8px;'>RM " + data.price + "<span style='font-size:11px;font-weight:400;color:#64748b;'> /month</span></div>" : "") +
                 (data.phone ? buildContactButtonsHtml(data.phone) : "") +
                 actionsHtml;
 
-            if (isOwner) {
-                var editBtn = popupContent.querySelector('.edit-pin-btn');
-                if (editBtn) {
-                    editBtn.onclick = function(e) {
-                        e.stopPropagation();
-                        openPropertyPanel('edit', index);
-                    };
-                }
-                var removeBtn = popupContent.querySelector('.remove-pin-btn');
-                if (removeBtn) {
-                    removeBtn.onclick = function(e) {
-                        e.stopPropagation();
-                        if (confirm('Delete this property listing?')) {
-                            fetch('/api/properties/' + data.id + '?user_id=' + currentUser.id, {
-                                method: 'DELETE',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ user_id: currentUser.id })
-                            })
-                            .then(function(res) { return res.json(); })
-                            .then(function(result) {
-                                if (result.error) {
-                                    alert(result.error);
-                                    return;
-                                }
-                                map.removeLayer(data.marker);
-                                landlordMarkers.splice(index, 1);
-                                editingMarkerIndex = -1;
-                                rebuildAllPopups();
-                            })
-                            .catch(function(err) {
-                                alert('Failed to delete property: ' + err.message);
-                            });
-                        }
-                    };
-                }
-            } else {
-                var viewBtn = popupContent.querySelector('.view-pin-btn');
-                if (viewBtn) {
-                    viewBtn.onclick = function(e) {
-                        e.stopPropagation();
-                        openPropertyPanel('view', index);
-                    };
-                }
+            var verifyBtn = popupContent.querySelector('.admin-verify-btn');
+            if (verifyBtn) {
+                verifyBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    togglePropertyVerification(data.id, index);
+                };
+            }
+            var editBtn = popupContent.querySelector('.edit-pin-btn');
+            if (editBtn) {
+                editBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    openPropertyPanel('edit', index);
+                };
+            }
+            var removeBtn = popupContent.querySelector('.remove-pin-btn');
+            if (removeBtn) {
+                removeBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    if (confirm('Delete this property listing?')) {
+                        fetch('/api/properties/' + data.id + '?user_id=' + currentUser.id, {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ user_id: currentUser.id })
+                        })
+                        .then(function(res) { return res.json(); })
+                        .then(function(result) {
+                            if (result.error) {
+                                alert(result.error);
+                                return;
+                            }
+                            map.removeLayer(data.marker);
+                            landlordMarkers.splice(index, 1);
+                            editingMarkerIndex = -1;
+                            rebuildAllPopups();
+                            if (document.getElementById('admin-modal-overlay').classList.contains('active')) {
+                                loadAdminData();
+                            }
+                        })
+                        .catch(function(err) {
+                            alert('Failed to delete property: ' + err.message);
+                        });
+                    }
+                };
+            }
+            var viewBtn = popupContent.querySelector('.view-pin-btn');
+            if (viewBtn) {
+                viewBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    openPropertyPanel('view', index);
+                };
             }
 
             return popupContent;
+        }
+
+        function togglePropertyVerification(propId, markerIndex) {
+            if (!currentUser || currentUser.role !== 'admin') return;
+            var target = null;
+            if (markerIndex !== undefined && markerIndex >= 0 && landlordMarkers[markerIndex]) {
+                target = landlordMarkers[markerIndex];
+            } else {
+                target = landlordMarkers.find(function(m) { return m.id === propId; });
+            }
+            if (!target) return;
+
+            var newStatus = target.is_verified === 1 ? 0 : 1;
+            fetch('/api/properties/' + propId + '/verify', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_id: currentUser.id, is_verified: newStatus })
+            })
+            .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
+            .then(function() {
+                target.is_verified = newStatus;
+                rebuildAllPopups();
+                if (panelMode === 'view' && editingMarkerIndex >= 0 && landlordMarkers[editingMarkerIndex] && landlordMarkers[editingMarkerIndex].id === propId) {
+                    openPropertyPanel('view', editingMarkerIndex);
+                }
+                if (document.getElementById('admin-modal-overlay').classList.contains('active')) {
+                    loadAdminData();
+                }
+            })
+            .catch(function(err) {
+                alert('Verification error: ' + err.message);
+            });
         }
 
         function refreshPopup(index) {
@@ -840,6 +1033,9 @@
                     deleteBtn.disabled = false;
                     deleteBtn.innerText = originalText;
                     closePropertyPanel();
+                    if (document.getElementById('admin-modal-overlay').classList.contains('active')) {
+                        loadAdminData();
+                    }
                 })
                 .catch(function(err) {
                     alert('Failed to delete property: ' + err.message);
@@ -912,6 +1108,7 @@
                 document.getElementById('panel-coords').innerText =
                     'Coordinates: ' + data.lat.toFixed(5) + ', ' + data.lng.toFixed(5);
             } else if (mode === 'view') {
+                editingMarkerIndex = index;
                 if (deleteBtn) deleteBtn.style.display = 'none';
                 var data = landlordMarkers[index];
                 title.innerText = data.name || 'Property Details';
@@ -924,11 +1121,25 @@
                 phoneInput.value = data.phone || '';
                 phoneInput.disabled = true;
                 var infoHtml = '<div class="landlord-view-card">';
+                if (data.is_verified === 1) {
+                    infoHtml += '<div class="panel-verified-banner"><span class="banner-badge">🛡️ Polisewa Verified</span><span class="banner-sub">Officially reviewed by platform admin</span></div>';
+                }
                 if (data.landlord_name) {
                     infoHtml += '<div class="landlord-view-header"><span class="landlord-badge">🔑 Landlord</span> <span class="landlord-name">' + data.landlord_name + '</span></div>';
                 }
                 if (data.phone) {
                     infoHtml += buildContactButtonsHtml(data.phone);
+                }
+                if (currentUser && currentUser.role === 'admin') {
+                    infoHtml += '<div class="panel-admin-box">' +
+                        '<div class="admin-box-title">🛡️ Admin Quick Controls</div>' +
+                        '<div class="admin-box-actions">' +
+                            '<button type="button" class="admin-toggle-btn ' + (data.is_verified === 1 ? 'btn-unverify' : 'btn-verify') + '" onclick="togglePropertyVerification(' + data.id + ', ' + index + ')">' +
+                                (data.is_verified === 1 ? 'Revoke Verified Status' : 'Mark as Verified') +
+                            '</button>' +
+                            '<button type="button" class="admin-edit-btn" onclick="openPropertyPanel(\'edit\', ' + index + ')">Edit Property</button>' +
+                        '</div>' +
+                    '</div>';
                 }
                 infoHtml += '</div>';
                 landlordInfo.innerHTML = infoHtml;
@@ -1166,22 +1377,24 @@
             }
         }
 
-        // Landlord click on map to immediately drop pin and open panel
+        // Landlord / Admin click on map to drop pin and open panel
         map.on('click', function(e) {
-            if (currentUser && currentUser.role === 'landlord') {
+            if (currentUser && (currentUser.role === 'landlord' || currentUser.role === 'admin')) {
                 if (!isInsideKuchingBoundary(e.latlng.lat, e.latlng.lng)) {
                     alert("Please select a location inside the orange Kuching boundary line.");
                     return;
                 }
-                var myCount = 0;
-                for (var i = 0; i < landlordMarkers.length; i++) {
-                    if (landlordMarkers[i].user_id === currentUser.id) {
-                        myCount++;
+                if (currentUser.role !== 'admin') {
+                    var myCount = 0;
+                    for (var i = 0; i < landlordMarkers.length; i++) {
+                        if (landlordMarkers[i].user_id === currentUser.id) {
+                            myCount++;
+                        }
                     }
-                }
-                if (myCount >= 2) {
-                    alert("You can only add up to 2 property pinpoints.");
-                    return;
+                    if (myCount >= 2) {
+                        alert("You can only add up to 2 property pinpoints.");
+                        return;
+                    }
                 }
                 pendingLatLng = e.latlng;
 
@@ -1213,6 +1426,9 @@
                 }
                 if (deleteModalOverlay && deleteModalOverlay.classList.contains('active')) {
                     closeDeleteAccountModal();
+                }
+                if (adminModalOverlay && adminModalOverlay.classList.contains('active')) {
+                    closeAdminDashboardModal();
                 }
                 if (authDropdown && authDropdown.classList.contains('active')) {
                     authDropdown.classList.remove('active');
@@ -1351,6 +1567,7 @@
                     var div = document.createElement('div');
                     div.className = 'result-item';
 
+                    var verifiedTag = prop.is_verified === 1 ? '<span class="result-verified-badge">🛡️ Verified</span>' : '';
                     var priceTag = prop.price ? '<span class="result-price-badge">RM ' + escapeHtml(prop.price) + '/mo</span>' : '';
                     var descSnippet = prop.desc ? escapeHtml(prop.desc) : 'No description';
                     var landlordTag = prop.landlord_name ? ' • 🔑 ' + escapeHtml(prop.landlord_name) : '';
@@ -1359,6 +1576,7 @@
                         '<div class="result-text">' +
                             '<div class="result-title">' +
                                 '<span class="result-name">' + escapeHtml(prop.name || 'Rental Property') + '</span>' +
+                                verifiedTag +
                                 priceTag +
                             '</div>' +
                             '<div class="result-sub">' + descSnippet + landlordTag + '</div>' +
@@ -1485,6 +1703,7 @@
         var authModalOverlay = document.getElementById("auth-modal-overlay");
         var authDropdown = document.getElementById("auth-dropdown");
         var deleteModalOverlay = document.getElementById("delete-modal-overlay");
+        var adminModalOverlay = document.getElementById("admin-modal-overlay");
 
         // Restore user session from localStorage on page load
         var savedSession = null;
@@ -1510,16 +1729,20 @@
         };
 
         function updateAuthButton() {
+            var adminBtn = document.getElementById("auth-admin-btn");
             if (currentUser) {
-                var roleIcon = currentUser.role === 'student' ? '🎓' : '🔑';
-                var firstName = currentUser.name.split(' ')[0];
+                var roleIcon = currentUser.role === 'admin' ? '🛡️' : (currentUser.role === 'student' ? '🎓' : '🔑');
+                var displayName = currentUser.role === 'admin' ? 'Admin ' + currentUser.name.split(' ')[0] : 'Hello, ' + currentUser.name.split(' ')[0];
                 authBtn.innerHTML = `
                     <span class="auth-role-badge">${roleIcon}</span>
-                    <span class="auth-btn-text">Hello, ${firstName}</span>
+                    <span class="auth-btn-text">${displayName}</span>
                     <svg class="auth-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                 `;
+                if (adminBtn) {
+                    adminBtn.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+                }
             } else {
                 authBtn.innerHTML = `
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1529,6 +1752,7 @@
                     <span class="auth-btn-text">Login / Sign Up</span>
                 `;
                 authDropdown.classList.remove('active');
+                if (adminBtn) adminBtn.style.display = 'none';
             }
         }
 
@@ -1916,6 +2140,291 @@
                     submitBtn.disabled = false;
                     submitBtn.innerText = originalText;
                 });
+        }
+
+        // 7. Admin Console Controllers
+        var adminPropertiesData = [];
+        var adminUsersData = [];
+        var activeAdminTab = 'properties';
+
+        function openAdminDashboardModal() {
+            if (!currentUser || currentUser.role !== 'admin') return;
+            if (authDropdown) authDropdown.classList.remove('active');
+            adminModalOverlay.classList.add('active');
+            switchAdminTab('properties');
+            loadAdminData();
+        }
+
+        function closeAdminDashboardModal() {
+            if (adminModalOverlay) adminModalOverlay.classList.remove('active');
+        }
+
+        adminModalOverlay.onclick = function(e) {
+            if (e.target === adminModalOverlay) {
+                closeAdminDashboardModal();
+            }
+        };
+
+        function switchAdminTab(tab) {
+            activeAdminTab = tab;
+            var tabBtnProps = document.getElementById('tab-btn-properties');
+            var tabBtnUsers = document.getElementById('tab-btn-users');
+            var tabContentProps = document.getElementById('admin-tab-properties');
+            var tabContentUsers = document.getElementById('admin-tab-users');
+
+            if (tabBtnProps) tabBtnProps.classList.toggle('active', tab === 'properties');
+            if (tabBtnUsers) tabBtnUsers.classList.toggle('active', tab === 'users');
+            if (tabContentProps) tabContentProps.style.display = tab === 'properties' ? 'block' : 'none';
+            if (tabContentUsers) tabContentUsers.style.display = tab === 'users' ? 'block' : 'none';
+        }
+
+        function loadAdminData() {
+            if (!currentUser || currentUser.role !== 'admin') return;
+
+            // 1. Fetch Stats
+            fetch('/api/admin/stats?admin_id=' + currentUser.id)
+                .then(function(res) { return res.json(); })
+                .then(function(stats) {
+                    if (stats && !stats.error) {
+                        var statProp = document.getElementById('admin-stat-properties');
+                        var statVer = document.getElementById('admin-stat-verified');
+                        var statLand = document.getElementById('admin-stat-landlords');
+                        var statStud = document.getElementById('admin-stat-students');
+                        var countProps = document.getElementById('admin-count-props');
+                        var countUsers = document.getElementById('admin-count-users');
+
+                        if (statProp) statProp.innerText = stats.totalProperties || 0;
+                        if (statVer) statVer.innerText = stats.verifiedProperties || 0;
+                        if (statLand) statLand.innerText = stats.totalLandlords || 0;
+                        if (statStud) statStud.innerText = stats.totalStudents || 0;
+                        if (countProps) countProps.innerText = stats.totalProperties || 0;
+                        if (countUsers) countUsers.innerText = stats.totalUsers || 0;
+                    }
+                })
+                .catch(function(e) { console.error('Stats error:', e); });
+
+            // 2. Fetch Properties
+            fetch('/api/properties')
+                .then(function(res) { return res.json(); })
+                .then(function(props) {
+                    adminPropertiesData = Array.isArray(props) ? props : [];
+                    filterAdminProperties();
+                })
+                .catch(function(e) { console.error('Props error:', e); });
+
+            // 3. Fetch Users
+            fetch('/api/admin/users?admin_id=' + currentUser.id)
+                .then(function(res) { return res.json(); })
+                .then(function(users) {
+                    adminUsersData = Array.isArray(users) ? users : [];
+                    filterAdminUsers();
+                })
+                .catch(function(e) { console.error('Users error:', e); });
+        }
+
+        function filterAdminProperties() {
+            var searchInput = document.getElementById('admin-prop-search');
+            var filterInput = document.getElementById('admin-prop-filter');
+            var search = searchInput ? searchInput.value.toLowerCase().trim() : '';
+            var statusFilter = filterInput ? filterInput.value : 'all';
+
+            var filtered = adminPropertiesData.filter(function(p) {
+                var matchesSearch = !search ||
+                    (p.name && p.name.toLowerCase().includes(search)) ||
+                    (p.landlord_name && p.landlord_name.toLowerCase().includes(search)) ||
+                    (p.phone && p.phone.includes(search));
+
+                var matchesStatus = true;
+                if (statusFilter === 'verified') matchesStatus = p.is_verified === 1;
+                else if (statusFilter === 'unverified') matchesStatus = !p.is_verified || p.is_verified === 0;
+
+                return matchesSearch && matchesStatus;
+            });
+
+            renderAdminPropertiesTable(filtered);
+        }
+
+        function renderAdminPropertiesTable(list) {
+            var tbody = document.getElementById('admin-properties-tbody');
+            if (!tbody) return;
+
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="admin-table-empty">No property listings found.</td></tr>';
+                return;
+            }
+
+            var html = '';
+            list.forEach(function(p) {
+                var imgUrls = parseImageUrls(p.image);
+                var thumb = imgUrls[0] || 'https://placehold.co/80x60?text=No+Photo';
+                var isVer = p.is_verified === 1;
+
+                html += '<tr>' +
+                    '<td>' +
+                        '<div class="admin-prop-cell">' +
+                            '<img src="' + escapeHtml(thumb) + '" class="admin-table-thumb" alt="thumb" onerror="this.src=\'https://placehold.co/80x60?text=Photo\'" />' +
+                            '<div>' +
+                                '<div class="admin-prop-name">' + escapeHtml(p.name || 'Unnamed Property') + '</div>' +
+                                '<div class="admin-prop-desc">' + escapeHtml(p.desc ? (p.desc.substring(0, 45) + '...') : '') + '</div>' +
+                            '</div>' +
+                        '</div>' +
+                    '</td>' +
+                    '<td>' +
+                        '<div class="admin-user-cell">' +
+                            '<span class="admin-user-name">' + escapeHtml(p.landlord_name || 'Landlord') + '</span>' +
+                            '<span class="admin-user-sub">' + escapeHtml(p.phone || '-') + '</span>' +
+                        '</div>' +
+                    '</td>' +
+                    '<td><span class="admin-price-badge">RM ' + escapeHtml(p.price || '0') + '/mo</span></td>' +
+                    '<td>' +
+                        '<button class="admin-status-toggle ' + (isVer ? 'status-verified' : 'status-unverified') + '" onclick="adminTogglePropertyVerify(' + p.id + ', ' + (isVer ? 1 : 0) + ')">' +
+                            (isVer ? '✅ Verified' : '⏳ Unverified') +
+                        '</button>' +
+                    '</td>' +
+                    '<td style="text-align:right;">' +
+                        '<div class="admin-action-btns">' +
+                            '<button class="admin-tbl-btn admin-tbl-locate" title="Locate on Map" onclick="adminLocateProperty(' + p.lat + ', ' + p.lng + ', ' + p.id + ')">📍 Map</button>' +
+                            '<button class="admin-tbl-btn admin-tbl-delete" title="Delete Listing" onclick="adminDeleteProperty(' + p.id + ', \'' + escapeHtml(p.name).replace(/'/g, "\\'") + '\')">🗑️</button>' +
+                        '</div>' +
+                    '</td>' +
+                '</tr>';
+            });
+            tbody.innerHTML = html;
+        }
+
+        function filterAdminUsers() {
+            var searchInput = document.getElementById('admin-user-search');
+            var filterInput = document.getElementById('admin-user-filter');
+            var search = searchInput ? searchInput.value.toLowerCase().trim() : '';
+            var roleFilter = filterInput ? filterInput.value : 'all';
+
+            var filtered = adminUsersData.filter(function(u) {
+                var matchesSearch = !search ||
+                    (u.name && u.name.toLowerCase().includes(search)) ||
+                    (u.email && u.email.toLowerCase().includes(search)) ||
+                    (u.phone && u.phone.includes(search));
+
+                var matchesRole = roleFilter === 'all' || u.role === roleFilter;
+                return matchesSearch && matchesRole;
+            });
+
+            renderAdminUsersTable(filtered);
+        }
+
+        function renderAdminUsersTable(list) {
+            var tbody = document.getElementById('admin-users-tbody');
+            if (!tbody) return;
+
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="admin-table-empty">No users found.</td></tr>';
+                return;
+            }
+
+            var html = '';
+            list.forEach(function(u) {
+                var roleBadge = u.role === 'admin'
+                    ? '<span class="role-pill role-admin">🛡️ Admin</span>'
+                    : (u.role === 'landlord'
+                        ? '<span class="role-pill role-landlord">🔑 Landlord</span>'
+                        : '<span class="role-pill role-student">🎓 Student</span>');
+
+                var isVer = u.is_verified === 1;
+                var isSelf = currentUser && currentUser.id === u.id;
+
+                html += '<tr>' +
+                    '<td>' +
+                        '<div class="admin-user-cell">' +
+                            '<span class="admin-user-name">' + escapeHtml(u.name) + (isSelf ? ' <small style="color:var(--primary);font-weight:600;">(You)</small>' : '') + '</span>' +
+                            '<span class="admin-user-sub">' + escapeHtml(u.email) + ' • ' + escapeHtml(u.phone || '-') + '</span>' +
+                        '</div>' +
+                    '</td>' +
+                    '<td>' + roleBadge + '</td>' +
+                    '<td>' +
+                        '<button class="admin-status-toggle ' + (isVer ? 'status-verified' : 'status-unverified') + '" ' + (isSelf ? 'disabled' : '') + ' onclick="adminToggleUserVerify(' + u.id + ', ' + (isVer ? 1 : 0) + ')">' +
+                            (isVer ? '✅ Verified' : '⏳ Unverified') +
+                        '</button>' +
+                    '</td>' +
+                    '<td><span style="font-weight:600; font-size:13px; color:#334155;">' + (u.property_count || 0) + '</span></td>' +
+                    '<td style="text-align:right;">' +
+                        (!isSelf
+                            ? '<button class="admin-tbl-btn admin-tbl-delete" title="Delete User Account" onclick="adminDeleteUser(' + u.id + ', \'' + escapeHtml(u.name).replace(/'/g, "\\'") + '\')">🗑️ Delete</button>'
+                            : '<span style="font-size:12px;color:#94a3b8;">Protected</span>') +
+                    '</td>' +
+                '</tr>';
+            });
+            tbody.innerHTML = html;
+        }
+
+        function adminTogglePropertyVerify(propId, currentStatus) {
+            var newStatus = currentStatus === 1 ? 0 : 1;
+            fetch('/api/properties/' + propId + '/verify', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_id: currentUser.id, is_verified: newStatus })
+            })
+            .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
+            .then(function() {
+                loadProperties();
+                loadAdminData();
+            })
+            .catch(function(err) { alert('Error: ' + err.message); });
+        }
+
+        function adminDeleteProperty(propId, propName) {
+            if (!confirm('Are you sure you want to delete "' + propName + '"? All property photos will also be permanently deleted.')) return;
+
+            fetch('/api/properties/' + propId + '?user_id=' + currentUser.id, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: currentUser.id })
+            })
+            .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
+            .then(function() {
+                loadProperties();
+                loadAdminData();
+            })
+            .catch(function(err) { alert('Error: ' + err.message); });
+        }
+
+        function adminToggleUserVerify(userId, currentStatus) {
+            var newStatus = currentStatus === 1 ? 0 : 1;
+            fetch('/api/admin/users/' + userId + '/verify', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_id: currentUser.id, is_verified: newStatus })
+            })
+            .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
+            .then(function() {
+                loadAdminData();
+            })
+            .catch(function(err) { alert('Error: ' + err.message); });
+        }
+
+        function adminDeleteUser(userId, userName) {
+            if (!confirm('Are you sure you want to permanently delete user "' + userName + '"? ALL their listed properties and uploaded photos will also be deleted!')) return;
+
+            fetch('/api/admin/users/' + userId + '?admin_id=' + currentUser.id, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_id: currentUser.id })
+            })
+            .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
+            .then(function() {
+                loadProperties();
+                loadAdminData();
+            })
+            .catch(function(err) { alert('Error: ' + err.message); });
+        }
+
+        function adminLocateProperty(lat, lng, propId) {
+            closeAdminDashboardModal();
+            map.flyTo([lat, lng], 17, { animate: true, duration: 1.0 });
+            setTimeout(function() {
+                var found = landlordMarkers.find(function(m) { return m.id === propId; });
+                if (found && found.marker) {
+                    found.marker.openPopup();
+                }
+            }, 600);
         }
     </script>
 </body>

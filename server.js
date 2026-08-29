@@ -190,6 +190,101 @@ function initSqlite() {
     });
 }
 
+// Seed Administrator Accounts
+const DEFAULT_ADMINS = [
+    {
+        name: 'Abdul Khalil (Admin)',
+        email: 'abdulkhalilpro@gmail.com',
+        password: 'poli@sewaadministrator',
+        phone: '+60123456789',
+        role: 'admin',
+        extra: 'System Administrator'
+    },
+    {
+        name: 'Asyarif (Admin)',
+        email: 'asyarif3005@gmail.com',
+        password: '011poliadministrator123',
+        phone: '+60123456789',
+        role: 'admin',
+        extra: 'System Administrator'
+    },
+    {
+        name: 'Josh Alzon (Admin)',
+        email: 'joshalzon981@gmail.com',
+        password: 'joshadministrator*123@!',
+        phone: '+60123456789',
+        role: 'admin',
+        extra: 'System Administrator'
+    }
+];
+
+async function seedAdminAccounts() {
+    for (const admin of DEFAULT_ADMINS) {
+        const emailLower = admin.email.toLowerCase().trim();
+        try {
+            const hashedPassword = await bcrypt.hash(admin.password, 10);
+            if (dbType === 'mssql' && mssqlPool) {
+                const check = await mssqlPool.request()
+                    .input('email', sql.NVarChar, emailLower)
+                    .query('SELECT id FROM users WHERE email = @email');
+
+                if (check.recordset.length === 0) {
+                    await mssqlPool.request()
+                        .input('name', sql.NVarChar, admin.name)
+                        .input('email', sql.NVarChar, emailLower)
+                        .input('phone', sql.NVarChar, admin.phone)
+                        .input('password', sql.NVarChar, hashedPassword)
+                        .input('role', sql.NVarChar, admin.role)
+                        .input('extra', sql.NVarChar, admin.extra)
+                        .query(`
+                            INSERT INTO users (name, email, phone, password, role, extra, is_verified, otp_code, otp_expires_at)
+                            VALUES (@name, @email, @phone, @password, @role, @extra, 1, '', NULL)
+                        `);
+                    console.log(`🛡️ Seeded administrator account: ${emailLower}`);
+                } else {
+                    await mssqlPool.request()
+                        .input('email', sql.NVarChar, emailLower)
+                        .input('name', sql.NVarChar, admin.name)
+                        .input('password', sql.NVarChar, hashedPassword)
+                        .input('role', sql.NVarChar, admin.role)
+                        .input('extra', sql.NVarChar, admin.extra)
+                        .query(`
+                            UPDATE users SET name = @name, password = @password, role = @role, extra = @extra, is_verified = 1
+                            WHERE email = @email
+                        `);
+                }
+            } else if (sqliteDb) {
+                sqliteDb.get(`SELECT id FROM users WHERE email = ?`, [emailLower], (err, row) => {
+                    if (err) {
+                        console.error(`Error checking admin ${emailLower}:`, err.message);
+                        return;
+                    }
+                    if (!row) {
+                        sqliteDb.run(
+                            `INSERT INTO users (name, email, phone, password, role, extra, is_verified, otp_code, otp_expires_at) VALUES (?, ?, ?, ?, ?, ?, 1, '', '')`,
+                            [admin.name, emailLower, admin.phone, hashedPassword, admin.role, admin.extra],
+                            (insertErr) => {
+                                if (insertErr) console.error(`Error inserting admin ${emailLower}:`, insertErr.message);
+                                else console.log(`🛡️ Seeded administrator account: ${emailLower}`);
+                            }
+                        );
+                    } else {
+                        sqliteDb.run(
+                            `UPDATE users SET name = ?, password = ?, role = ?, extra = ?, is_verified = 1 WHERE email = ?`,
+                            [admin.name, hashedPassword, admin.role, admin.extra, emailLower],
+                            (updateErr) => {
+                                if (updateErr) console.error(`Error updating admin ${emailLower}:`, updateErr.message);
+                            }
+                        );
+                    }
+                });
+            }
+        } catch (e) {
+            console.error(`Error during admin seeding (${emailLower}):`, e.message);
+        }
+    }
+}
+
 async function initMssqlTables(pool) {
     try {
         await pool.request().query(`
@@ -234,6 +329,7 @@ async function initMssqlTables(pool) {
                 lat FLOAT NOT NULL,
                 lng FLOAT NOT NULL,
                 image NVARCHAR(MAX),
+                is_verified INT DEFAULT 0,
                 created_at DATETIME DEFAULT GETDATE()
             )
         `);
@@ -242,60 +338,111 @@ async function initMssqlTables(pool) {
             AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('properties') AND name = 'image')
             ALTER TABLE properties ADD image NVARCHAR(MAX);
         `);
+        await pool.request().query(`
+            IF EXISTS (SELECT * FROM sysobjects WHERE name='properties' AND xtype='U')
+            AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('properties') AND name = 'is_verified')
+            ALTER TABLE properties ADD is_verified INT DEFAULT 0;
+        `);
         console.log('Azure SQL tables verified and initialized successfully.');
+        await seedAdminAccounts();
     } catch (err) {
         console.error('Error initializing Azure SQL tables:', err.message);
     }
 }
 
 function initSqliteTables() {
-    sqliteDb.run(`
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            phone TEXT NOT NULL,
-            password TEXT NOT NULL,
-            role TEXT CHECK(role IN ('student', 'landlord')) NOT NULL,
-            extra TEXT,
-            is_verified INTEGER DEFAULT 0,
-            otp_code TEXT DEFAULT '',
-            otp_expires_at TEXT DEFAULT ''
-        )
-    `, (err) => {
-        if (err) console.error('Error creating users table:', err.message);
-        else console.log('Users table initialized successfully.');
+    sqliteDb.serialize(() => {
+        // Ensure users table exists with correct schema
+        sqliteDb.run(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                phone TEXT NOT NULL,
+                password TEXT NOT NULL,
+                role TEXT NOT NULL,
+                extra TEXT,
+                is_verified INTEGER DEFAULT 0,
+                otp_code TEXT DEFAULT '',
+                otp_expires_at TEXT DEFAULT ''
+            )
+        `);
 
-        sqliteDb.run(`ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0`, () => {});
-        sqliteDb.run(`ALTER TABLE users ADD COLUMN otp_code TEXT DEFAULT ''`, () => {});
-        sqliteDb.run(`ALTER TABLE users ADD COLUMN otp_expires_at TEXT DEFAULT ''`, () => {});
-    });
+        // Check columns and check constraint on users table
+        sqliteDb.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name='users'`, (masterErr, masterRow) => {
+            if (masterRow && masterRow.sql && masterRow.sql.includes("CHECK(role IN ('student', 'landlord'))")) {
+                console.log('🔄 Migrating SQLite users table to support admin role...');
+                sqliteDb.serialize(() => {
+                    sqliteDb.run(`CREATE TABLE users_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        email TEXT UNIQUE NOT NULL,
+                        phone TEXT NOT NULL,
+                        password TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        extra TEXT,
+                        is_verified INTEGER DEFAULT 0,
+                        otp_code TEXT DEFAULT '',
+                        otp_expires_at TEXT DEFAULT ''
+                    )`);
+                    sqliteDb.run(`INSERT OR IGNORE INTO users_new (id, name, email, phone, password, role, extra) SELECT id, name, email, phone, password, role, extra FROM users`);
+                    sqliteDb.run(`DROP TABLE users`);
+                    sqliteDb.run(`ALTER TABLE users_new RENAME TO users`, () => {
+                        seedAdminAccounts();
+                    });
+                });
+            } else {
+                sqliteDb.all(`PRAGMA table_info(users)`, (err, cols) => {
+                    if (cols) {
+                        const colNames = cols.map(c => c.name);
+                        if (!colNames.includes('is_verified')) {
+                            sqliteDb.run(`ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0`, () => {});
+                        }
+                        if (!colNames.includes('otp_code')) {
+                            sqliteDb.run(`ALTER TABLE users ADD COLUMN otp_code TEXT DEFAULT ''`, () => {});
+                        }
+                        if (!colNames.includes('otp_expires_at')) {
+                            sqliteDb.run(`ALTER TABLE users ADD COLUMN otp_expires_at TEXT DEFAULT ''`, () => {});
+                        }
+                    }
+                    seedAdminAccounts();
+                });
+            }
+        });
 
-    sqliteDb.run(`
-        CREATE TABLE IF NOT EXISTS properties (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            desc TEXT DEFAULT '',
-            price TEXT DEFAULT '',
-            phone TEXT DEFAULT '',
-            lat REAL NOT NULL,
-            lng REAL NOT NULL,
-            image TEXT DEFAULT '',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    `, (err) => {
-        if (err) {
-            console.error('Error creating properties table:', err.message);
-        } else {
-            console.log('Properties table initialized successfully.');
-            sqliteDb.run(`ALTER TABLE properties ADD COLUMN image TEXT DEFAULT ''`, (alterErr) => {
-                if (alterErr && !alterErr.message.includes('duplicate column')) {
-                    console.error('Error adding image column:', alterErr.message);
-                }
-            });
-        }
+        // Ensure properties table exists
+        sqliteDb.run(`
+            CREATE TABLE IF NOT EXISTS properties (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                desc TEXT DEFAULT '',
+                price TEXT DEFAULT '',
+                phone TEXT DEFAULT '',
+                lat REAL NOT NULL,
+                lng REAL NOT NULL,
+                image TEXT DEFAULT '',
+                is_verified INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        `, (err) => {
+            if (err) {
+                console.error('Error creating properties table:', err.message);
+            } else {
+                sqliteDb.all(`PRAGMA table_info(properties)`, (err2, cols) => {
+                    if (cols) {
+                        const colNames = cols.map(c => c.name);
+                        if (!colNames.includes('image')) {
+                            sqliteDb.run(`ALTER TABLE properties ADD COLUMN image TEXT DEFAULT ''`, () => {});
+                        }
+                        if (!colNames.includes('is_verified')) {
+                            sqliteDb.run(`ALTER TABLE properties ADD COLUMN is_verified INTEGER DEFAULT 0`, () => {});
+                        }
+                    }
+                });
+            }
+        });
     });
 }
 
@@ -636,6 +783,7 @@ app.post('/api/signin', async (req, res) => {
 });
 
 // GET ALL PROPERTIES
+// GET ALL PROPERTIES
 app.get('/api/properties', async (req, res) => {
     try {
         if (dbType === 'mssql') {
@@ -650,13 +798,15 @@ app.get('/api/properties', async (req, res) => {
                     p.lat, 
                     p.lng, 
                     p.image,
-                    u.name AS landlord_name
+                    ISNULL(p.is_verified, 0) AS is_verified,
+                    u.name AS landlord_name,
+                    u.role AS landlord_role
                 FROM properties p
                 JOIN users u ON p.user_id = u.id
             `);
             res.status(200).json(result.recordset);
         } else {
-            const sqlQuery = `SELECT properties.*, users.name as landlord_name FROM properties JOIN users ON properties.user_id = users.id`;
+            const sqlQuery = `SELECT properties.*, users.name as landlord_name, users.role as landlord_role FROM properties JOIN users ON properties.user_id = users.id`;
             sqliteDb.all(sqlQuery, [], (err, rows) => {
                 if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
                 res.json(rows);
@@ -686,7 +836,7 @@ function hasValidPhotos(image) {
     return false;
 }
 
-// CREATE PROPERTY (Max 2 per landlord)
+// CREATE PROPERTY (Max 2 per landlord, unlimited for admin)
 app.post('/api/properties', async (req, res) => {
     const { user_id, name, desc, price, phone, lat, lng, image } = req.body;
     const trimmedName = name ? String(name).trim() : '';
@@ -700,11 +850,18 @@ app.post('/api/properties', async (req, res) => {
 
     try {
         if (dbType === 'mssql') {
-            const countRes = await mssqlPool.request()
+            const userRes = await mssqlPool.request()
                 .input('user_id', sql.Int, user_id)
-                .query('SELECT COUNT(*) as count FROM properties WHERE user_id = @user_id');
-            if (countRes.recordset[0].count >= 2) {
-                return res.status(400).json({ error: 'Maximum 2 properties allowed per landlord.' });
+                .query('SELECT role FROM users WHERE id = @user_id');
+            const isAdmin = userRes.recordset.length > 0 && userRes.recordset[0].role === 'admin';
+
+            if (!isAdmin) {
+                const countRes = await mssqlPool.request()
+                    .input('user_id', sql.Int, user_id)
+                    .query('SELECT COUNT(*) as count FROM properties WHERE user_id = @user_id');
+                if (countRes.recordset[0].count >= 2) {
+                    return res.status(400).json({ error: 'Maximum 2 properties allowed per landlord.' });
+                }
             }
 
             const result = await mssqlPool.request()
@@ -717,24 +874,36 @@ app.post('/api/properties', async (req, res) => {
                 .input('lng', sql.Float, lng)
                 .input('image', sql.NVarChar, image || '')
                 .query(`
-                    INSERT INTO properties (user_id, name, [desc], price, phone, lat, lng, image)
+                    INSERT INTO properties (user_id, name, [desc], price, phone, lat, lng, image, is_verified)
                     OUTPUT INSERTED.id
-                    VALUES (@user_id, @name, @desc, @price, @phone, @lat, @lng, @image)
+                    VALUES (@user_id, @name, @desc, @price, @phone, @lat, @lng, @image, 0)
                 `);
 
             res.status(201).json({ id: result.recordset[0].id, message: 'Property created.' });
         } else {
-            sqliteDb.get(`SELECT COUNT(*) as count FROM properties WHERE user_id = ?`, [user_id], (err, row) => {
-                if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
-                if (row.count >= 2) {
-                    return res.status(400).json({ error: 'Maximum 2 properties allowed per landlord.' });
-                }
+            sqliteDb.get(`SELECT role FROM users WHERE id = ?`, [user_id], (errUser, userRow) => {
+                if (errUser) return res.status(500).json({ error: 'Database error: ' + errUser.message });
+                const isAdmin = userRow && userRow.role === 'admin';
 
-                const sqlQuery = `INSERT INTO properties (user_id, name, desc, price, phone, lat, lng, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-                sqliteDb.run(sqlQuery, [user_id, trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, lat, lng, image || ''], function(err2) {
-                    if (err2) return res.status(500).json({ error: 'Database error: ' + err2.message });
-                    res.status(201).json({ id: this.lastID, message: 'Property created.' });
-                });
+                const insertProperty = () => {
+                    const sqlQuery = `INSERT INTO properties (user_id, name, desc, price, phone, lat, lng, image, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`;
+                    sqliteDb.run(sqlQuery, [user_id, trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, lat, lng, image || ''], function(err2) {
+                        if (err2) return res.status(500).json({ error: 'Database error: ' + err2.message });
+                        res.status(201).json({ id: this.lastID, message: 'Property created.' });
+                    });
+                };
+
+                if (!isAdmin) {
+                    sqliteDb.get(`SELECT COUNT(*) as count FROM properties WHERE user_id = ?`, [user_id], (err, row) => {
+                        if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+                        if (row.count >= 2) {
+                            return res.status(400).json({ error: 'Maximum 2 properties allowed per landlord.' });
+                        }
+                        insertProperty();
+                    });
+                } else {
+                    insertProperty();
+                }
             });
         }
     } catch (err) {
@@ -743,7 +912,7 @@ app.post('/api/properties', async (req, res) => {
     }
 });
 
-// UPDATE PROPERTY
+// UPDATE PROPERTY (Owner or Admin)
 app.put('/api/properties/:id', async (req, res) => {
     const { id } = req.params;
     const { user_id, name, desc, price, phone, image } = req.body;
@@ -758,29 +927,46 @@ app.put('/api/properties/:id', async (req, res) => {
 
     try {
         if (dbType === 'mssql') {
-            const result = await mssqlPool.request()
-                .input('id', sql.Int, id)
+            const userRes = await mssqlPool.request()
                 .input('user_id', sql.Int, user_id)
+                .query('SELECT role FROM users WHERE id = @user_id');
+            const isAdmin = userRes.recordset.length > 0 && userRes.recordset[0].role === 'admin';
+
+            const query = isAdmin
+                ? `UPDATE properties SET name = @name, [desc] = @desc, price = @price, phone = @phone, image = @image WHERE id = @id`
+                : `UPDATE properties SET name = @name, [desc] = @desc, price = @price, phone = @phone, image = @image WHERE id = @id AND user_id = @user_id`;
+
+            const reqObj = mssqlPool.request()
+                .input('id', sql.Int, id)
                 .input('name', sql.NVarChar, trimmedName)
                 .input('desc', sql.NVarChar, trimmedDesc)
                 .input('price', sql.NVarChar, trimmedPrice)
                 .input('phone', sql.NVarChar, trimmedPhone)
-                .input('image', sql.NVarChar, image || '')
-                .query(`
-                    UPDATE properties
-                    SET name = @name, [desc] = @desc, price = @price, phone = @phone, image = @image
-                    WHERE id = @id AND user_id = @user_id
-                `);
+                .input('image', sql.NVarChar, image || '');
+            if (!isAdmin) reqObj.input('user_id', sql.Int, user_id);
+
+            const result = await reqObj.query(query);
             if (result.rowsAffected[0] === 0) {
                 return res.status(404).json({ error: 'Property not found or user is not authorized to edit it.' });
             }
-            res.status(200).json({ message: 'Property updated.' });
+            res.status(200).json({ message: 'Property updated successfully.' });
         } else {
-            const sqlQuery = `UPDATE properties SET name = ?, desc = ?, price = ?, phone = ?, image = ? WHERE id = ? AND user_id = ?`;
-            sqliteDb.run(sqlQuery, [trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, image || '', id, user_id], function(err) {
-                if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
-                if (this.changes === 0) return res.status(404).json({ error: 'Property not found or not owned by you.' });
-                res.json({ message: 'Property updated.' });
+            sqliteDb.get(`SELECT role FROM users WHERE id = ?`, [user_id], (errUser, userRow) => {
+                if (errUser) return res.status(500).json({ error: 'Database error: ' + errUser.message });
+                const isAdmin = userRow && userRow.role === 'admin';
+
+                const sqlQuery = isAdmin
+                    ? `UPDATE properties SET name = ?, desc = ?, price = ?, phone = ?, image = ? WHERE id = ?`
+                    : `UPDATE properties SET name = ?, desc = ?, price = ?, phone = ?, image = ? WHERE id = ? AND user_id = ?`;
+                const params = isAdmin
+                    ? [trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, image || '', id]
+                    : [trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, image || '', id, user_id];
+
+                sqliteDb.run(sqlQuery, params, function(err) {
+                    if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+                    if (this.changes === 0) return res.status(404).json({ error: 'Property not found or not owned by you.' });
+                    res.json({ message: 'Property updated successfully.' });
+                });
             });
         }
     } catch (err) {
@@ -789,7 +975,7 @@ app.put('/api/properties/:id', async (req, res) => {
     }
 });
 
-// DELETE PROPERTY
+// DELETE PROPERTY (Owner or Admin)
 app.delete('/api/properties/:id', async (req, res) => {
     const { id } = req.params;
     const user_id = (req.body && req.body.user_id) ? req.body.user_id : req.query.user_id;
@@ -797,20 +983,69 @@ app.delete('/api/properties/:id', async (req, res) => {
 
     try {
         if (dbType === 'mssql') {
-            const result = await mssqlPool.request()
-                .input('id', sql.Int, id)
+            const userRes = await mssqlPool.request()
                 .input('user_id', sql.Int, user_id)
-                .query(`DELETE FROM properties WHERE id = @id AND user_id = @user_id`);
+                .query('SELECT role FROM users WHERE id = @user_id');
+            const isAdmin = userRes.recordset.length > 0 && userRes.recordset[0].role === 'admin';
+
+            // Delete associated images
+            const propRes = await mssqlPool.request().input('id', sql.Int, id).query('SELECT image FROM properties WHERE id = @id');
+            if (propRes.recordset.length > 0 && propRes.recordset[0].image) {
+                try {
+                    const parsed = JSON.parse(propRes.recordset[0].image);
+                    const urls = Array.isArray(parsed) ? parsed : [parsed];
+                    urls.forEach(u => {
+                        const fp = path.join(UPLOAD_DIR, path.basename(u));
+                        try { fs.unlinkSync(fp); } catch(e) {}
+                    });
+                } catch(e) {
+                    const fp = path.join(UPLOAD_DIR, path.basename(propRes.recordset[0].image));
+                    try { fs.unlinkSync(fp); } catch(e) {}
+                }
+            }
+
+            const deleteQuery = isAdmin
+                ? `DELETE FROM properties WHERE id = @id`
+                : `DELETE FROM properties WHERE id = @id AND user_id = @user_id`;
+            const reqObj = mssqlPool.request().input('id', sql.Int, id);
+            if (!isAdmin) reqObj.input('user_id', sql.Int, user_id);
+
+            const result = await reqObj.query(deleteQuery);
             if (result.rowsAffected[0] === 0) {
                 return res.status(404).json({ error: 'Property not found or user is not authorized to delete it.' });
             }
-            res.status(200).json({ message: 'Property deleted.' });
+            res.status(200).json({ message: 'Property deleted successfully.' });
         } else {
-            const sqlQuery = `DELETE FROM properties WHERE id = ? AND user_id = ?`;
-            sqliteDb.run(sqlQuery, [id, user_id], function(err) {
-                if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
-                if (this.changes === 0) return res.status(404).json({ error: 'Property not found or not owned by you.' });
-                res.json({ message: 'Property deleted.' });
+            sqliteDb.get(`SELECT role FROM users WHERE id = ?`, [user_id], (errUser, userRow) => {
+                if (errUser) return res.status(500).json({ error: 'Database error: ' + errUser.message });
+                const isAdmin = userRow && userRow.role === 'admin';
+
+                sqliteDb.get(`SELECT image FROM properties WHERE id = ?`, [id], (errImg, propRow) => {
+                    if (propRow && propRow.image) {
+                        try {
+                            const parsed = JSON.parse(propRow.image);
+                            const urls = Array.isArray(parsed) ? parsed : [parsed];
+                            urls.forEach(u => {
+                                const fp = path.join(UPLOAD_DIR, path.basename(u));
+                                try { fs.unlinkSync(fp); } catch(e) {}
+                            });
+                        } catch(e) {
+                            const fp = path.join(UPLOAD_DIR, path.basename(propRow.image));
+                            try { fs.unlinkSync(fp); } catch(e) {}
+                        }
+                    }
+
+                    const sqlQuery = isAdmin
+                        ? `DELETE FROM properties WHERE id = ?`
+                        : `DELETE FROM properties WHERE id = ? AND user_id = ?`;
+                    const params = isAdmin ? [id] : [id, user_id];
+
+                    sqliteDb.run(sqlQuery, params, function(err) {
+                        if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+                        if (this.changes === 0) return res.status(404).json({ error: 'Property not found or not owned by you.' });
+                        res.json({ message: 'Property deleted successfully.' });
+                    });
+                });
             });
         }
     } catch (err) {
@@ -819,7 +1054,287 @@ app.delete('/api/properties/:id', async (req, res) => {
     }
 });
 
-// DELETE USER ACCOUNT
+// TOGGLE PROPERTY VERIFICATION (Admin only)
+app.patch('/api/properties/:id/verify', async (req, res) => {
+    const { id } = req.params;
+    const { admin_id, is_verified } = req.body;
+    if (!admin_id) return res.status(401).json({ error: 'Admin authentication required.' });
+
+    const newStatus = (is_verified === 1 || is_verified === true || is_verified === '1') ? 1 : 0;
+
+    try {
+        if (dbType === 'mssql') {
+            const adminCheck = await mssqlPool.request()
+                .input('admin_id', sql.Int, admin_id)
+                .query('SELECT role FROM users WHERE id = @admin_id');
+            if (adminCheck.recordset.length === 0 || adminCheck.recordset[0].role !== 'admin') {
+                return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+            }
+
+            await mssqlPool.request()
+                .input('id', sql.Int, id)
+                .input('is_verified', sql.Int, newStatus)
+                .query('UPDATE properties SET is_verified = @is_verified WHERE id = @id');
+
+            res.status(200).json({
+                message: newStatus === 1 ? 'Listing marked as Polisewa Verified!' : 'Listing verification removed.',
+                is_verified: newStatus
+            });
+        } else {
+            sqliteDb.get(`SELECT role FROM users WHERE id = ?`, [admin_id], (err, admin) => {
+                if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+                if (!admin || admin.role !== 'admin') {
+                    return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+                }
+
+                sqliteDb.run(`UPDATE properties SET is_verified = ? WHERE id = ?`, [newStatus, id], function(updateErr) {
+                    if (updateErr) return res.status(500).json({ error: 'Database error: ' + updateErr.message });
+                    res.json({
+                        message: newStatus === 1 ? 'Listing marked as Polisewa Verified!' : 'Listing verification removed.',
+                        is_verified: newStatus
+                    });
+                });
+            });
+        }
+    } catch (err) {
+        console.error('Verify property error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// ADMIN: GET PLATFORM STATISTICS
+app.get('/api/admin/stats', async (req, res) => {
+    const admin_id = req.query.admin_id;
+    if (!admin_id) return res.status(401).json({ error: 'Admin ID required.' });
+
+    try {
+        if (dbType === 'mssql') {
+            const adminCheck = await mssqlPool.request()
+                .input('admin_id', sql.Int, admin_id)
+                .query('SELECT role FROM users WHERE id = @admin_id');
+            if (adminCheck.recordset.length === 0 || adminCheck.recordset[0].role !== 'admin') {
+                return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+            }
+
+            const statsRes = await mssqlPool.request().query(`
+                SELECT
+                    (SELECT COUNT(*) FROM properties) AS totalProperties,
+                    (SELECT COUNT(*) FROM properties WHERE is_verified = 1) AS verifiedProperties,
+                    (SELECT COUNT(*) FROM users WHERE role = 'student') AS totalStudents,
+                    (SELECT COUNT(*) FROM users WHERE role = 'landlord') AS totalLandlords,
+                    (SELECT COUNT(*) FROM users WHERE role = 'admin') AS totalAdmins,
+                    (SELECT COUNT(*) FROM users) AS totalUsers
+            `);
+            res.status(200).json(statsRes.recordset[0]);
+        } else {
+            sqliteDb.get(`SELECT role FROM users WHERE id = ?`, [admin_id], (err, admin) => {
+                if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+                if (!admin || admin.role !== 'admin') {
+                    return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+                }
+
+                sqliteDb.get(`
+                    SELECT
+                        (SELECT COUNT(*) FROM properties) AS totalProperties,
+                        (SELECT COUNT(*) FROM properties WHERE is_verified = 1) AS verifiedProperties,
+                        (SELECT COUNT(*) FROM users WHERE role = 'student') AS totalStudents,
+                        (SELECT COUNT(*) FROM users WHERE role = 'landlord') AS totalLandlords,
+                        (SELECT COUNT(*) FROM users WHERE role = 'admin') AS totalAdmins,
+                        (SELECT COUNT(*) FROM users) AS totalUsers
+                `, [], (errStats, stats) => {
+                    if (errStats) return res.status(500).json({ error: 'Database error: ' + errStats.message });
+                    res.json(stats);
+                });
+            });
+        }
+    } catch (err) {
+        console.error('Admin stats error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// ADMIN: GET ALL REGISTERED USERS
+app.get('/api/admin/users', async (req, res) => {
+    const admin_id = req.query.admin_id;
+    if (!admin_id) return res.status(401).json({ error: 'Admin ID required.' });
+
+    try {
+        if (dbType === 'mssql') {
+            const adminCheck = await mssqlPool.request()
+                .input('admin_id', sql.Int, admin_id)
+                .query('SELECT role FROM users WHERE id = @admin_id');
+            if (adminCheck.recordset.length === 0 || adminCheck.recordset[0].role !== 'admin') {
+                return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+            }
+
+            const usersRes = await mssqlPool.request().query(`
+                SELECT 
+                    u.id, 
+                    u.name, 
+                    u.email, 
+                    u.phone, 
+                    u.role, 
+                    u.extra, 
+                    u.is_verified,
+                    (SELECT COUNT(*) FROM properties p WHERE p.user_id = u.id) AS property_count
+                FROM users u
+                ORDER BY u.id DESC
+            `);
+            res.status(200).json(usersRes.recordset);
+        } else {
+            sqliteDb.get(`SELECT role FROM users WHERE id = ?`, [admin_id], (err, admin) => {
+                if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+                if (!admin || admin.role !== 'admin') {
+                    return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+                }
+
+                sqliteDb.all(`
+                    SELECT 
+                        u.id, 
+                        u.name, 
+                        u.email, 
+                        u.phone, 
+                        u.role, 
+                        u.extra, 
+                        u.is_verified,
+                        (SELECT COUNT(*) FROM properties p WHERE p.user_id = u.id) AS property_count
+                    FROM users u
+                    ORDER BY u.id DESC
+                `, [], (errUsers, rows) => {
+                    if (errUsers) return res.status(500).json({ error: 'Database error: ' + errUsers.message });
+                    res.json(rows);
+                });
+            });
+        }
+    } catch (err) {
+        console.error('Admin users error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// ADMIN: DELETE USER ACCOUNT
+app.delete('/api/admin/users/:id', async (req, res) => {
+    const { id } = req.params;
+    const admin_id = (req.body && req.body.admin_id) ? req.body.admin_id : req.query.admin_id;
+    if (!admin_id) return res.status(401).json({ error: 'Admin ID required.' });
+
+    try {
+        if (dbType === 'mssql') {
+            const adminCheck = await mssqlPool.request()
+                .input('admin_id', sql.Int, admin_id)
+                .query('SELECT role FROM users WHERE id = @admin_id');
+            if (adminCheck.recordset.length === 0 || adminCheck.recordset[0].role !== 'admin') {
+                return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+            }
+
+            const imgRes = await mssqlPool.request()
+                .input('user_id', sql.Int, id)
+                .query('SELECT image FROM properties WHERE user_id = @user_id');
+            imgRes.recordset.forEach(row => {
+                if (row.image) {
+                    try {
+                        const parsed = JSON.parse(row.image);
+                        const urls = Array.isArray(parsed) ? parsed : [parsed];
+                        urls.forEach(u => {
+                            const fp = path.join(UPLOAD_DIR, path.basename(u));
+                            try { fs.unlinkSync(fp); } catch(e) {}
+                        });
+                    } catch(e) {
+                        const fp = path.join(UPLOAD_DIR, path.basename(row.image));
+                        try { fs.unlinkSync(fp); } catch(e) {}
+                    }
+                }
+            });
+
+            await mssqlPool.request().input('user_id', sql.Int, id).query('DELETE FROM properties WHERE user_id = @user_id');
+            await mssqlPool.request().input('id', sql.Int, id).query('DELETE FROM users WHERE id = @id');
+
+            res.status(200).json({ message: 'User account and all associated properties removed.' });
+        } else {
+            sqliteDb.get(`SELECT role FROM users WHERE id = ?`, [admin_id], (err, admin) => {
+                if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+                if (!admin || admin.role !== 'admin') {
+                    return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+                }
+
+                sqliteDb.all(`SELECT image FROM properties WHERE user_id = ?`, [id], (errImgs, rows) => {
+                    if (rows) {
+                        rows.forEach(row => {
+                            if (row.image) {
+                                try {
+                                    const parsed = JSON.parse(row.image);
+                                    const urls = Array.isArray(parsed) ? parsed : [parsed];
+                                    urls.forEach(u => {
+                                        const fp = path.join(UPLOAD_DIR, path.basename(u));
+                                        try { fs.unlinkSync(fp); } catch(e) {}
+                                    });
+                                } catch(e) {
+                                    const fp = path.join(UPLOAD_DIR, path.basename(row.image));
+                                    try { fs.unlinkSync(fp); } catch(e) {}
+                                }
+                            }
+                        });
+                    }
+
+                    sqliteDb.run(`DELETE FROM properties WHERE user_id = ?`, [id], (errDelProp) => {
+                        if (errDelProp) return res.status(500).json({ error: 'Database error: ' + errDelProp.message });
+                        sqliteDb.run(`DELETE FROM users WHERE id = ?`, [id], (errDelUser) => {
+                            if (errDelUser) return res.status(500).json({ error: 'Database error: ' + errDelUser.message });
+                            res.json({ message: 'User account and all associated properties removed.' });
+                        });
+                    });
+                });
+            });
+        }
+    } catch (err) {
+        console.error('Admin delete user error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// ADMIN: TOGGLE USER EMAIL VERIFICATION
+app.patch('/api/admin/users/:id/verify', async (req, res) => {
+    const { id } = req.params;
+    const { admin_id, is_verified } = req.body;
+    if (!admin_id) return res.status(401).json({ error: 'Admin ID required.' });
+
+    const newStatus = (is_verified === 1 || is_verified === true || is_verified === '1') ? 1 : 0;
+
+    try {
+        if (dbType === 'mssql') {
+            const adminCheck = await mssqlPool.request()
+                .input('admin_id', sql.Int, admin_id)
+                .query('SELECT role FROM users WHERE id = @admin_id');
+            if (adminCheck.recordset.length === 0 || adminCheck.recordset[0].role !== 'admin') {
+                return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+            }
+
+            await mssqlPool.request()
+                .input('id', sql.Int, id)
+                .input('is_verified', sql.Int, newStatus)
+                .query('UPDATE users SET is_verified = @is_verified WHERE id = @id');
+
+            res.status(200).json({ message: `User verification updated to ${newStatus === 1 ? 'Verified' : 'Unverified'}.`, is_verified: newStatus });
+        } else {
+            sqliteDb.get(`SELECT role FROM users WHERE id = ?`, [admin_id], (err, admin) => {
+                if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+                if (!admin || admin.role !== 'admin') {
+                    return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+                }
+
+                sqliteDb.run(`UPDATE users SET is_verified = ? WHERE id = ?`, [newStatus, id], function(errUpdate) {
+                    if (errUpdate) return res.status(500).json({ error: 'Database error: ' + errUpdate.message });
+                    res.json({ message: `User verification updated to ${newStatus === 1 ? 'Verified' : 'Unverified'}.`, is_verified: newStatus });
+                });
+            });
+        }
+    } catch (err) {
+        console.error('Admin user verify error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// DELETE USER ACCOUNT (Self)
 app.delete('/api/user', async (req, res) => {
     const { user_id, password } = req.body;
     if (!user_id || !password) return res.status(400).json({ error: 'user_id and password are required.' });
@@ -840,8 +1355,17 @@ app.delete('/api/user', async (req, res) => {
                 .query('SELECT image FROM properties WHERE user_id = @user_id');
             imgRes.recordset.forEach(row => {
                 if (row.image) {
-                    const filePath = path.join(UPLOAD_DIR, path.basename(row.image));
-                    try { fs.unlinkSync(filePath); } catch (e) {}
+                    try {
+                        const parsed = JSON.parse(row.image);
+                        const urls = Array.isArray(parsed) ? parsed : [parsed];
+                        urls.forEach(u => {
+                            const fp = path.join(UPLOAD_DIR, path.basename(u));
+                            try { fs.unlinkSync(fp); } catch(e) {}
+                        });
+                    } catch(e) {
+                        const fp = path.join(UPLOAD_DIR, path.basename(row.image));
+                        try { fs.unlinkSync(fp); } catch(e) {}
+                    }
                 }
             });
 
@@ -871,8 +1395,17 @@ app.delete('/api/user', async (req, res) => {
                     if (rows) {
                         rows.forEach(row => {
                             if (row.image) {
-                                const filePath = path.join(UPLOAD_DIR, path.basename(row.image));
-                                try { fs.unlinkSync(filePath); } catch (e) {}
+                                try {
+                                    const parsed = JSON.parse(row.image);
+                                    const urls = Array.isArray(parsed) ? parsed : [parsed];
+                                    urls.forEach(u => {
+                                        const fp = path.join(UPLOAD_DIR, path.basename(u));
+                                        try { fs.unlinkSync(fp); } catch(e) {}
+                                    });
+                                } catch(e) {
+                                    const fp = path.join(UPLOAD_DIR, path.basename(row.image));
+                                    try { fs.unlinkSync(fp); } catch(e) {}
+                                }
                             }
                         });
                     }
