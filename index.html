@@ -2357,7 +2357,8 @@
             if (!currentUser || currentUser.role !== 'admin') return;
 
             // 1. Fetch Stats
-            fetch('/api/admin/stats?admin_id=' + currentUser.id)
+            // 1. Fetch Stats
+            fetch('/api/admin/stats?admin_id=' + encodeURIComponent(currentUser.id) + '&admin_email=' + encodeURIComponent(currentUser.email || ''))
                 .then(function(res) { return res.json(); })
                 .then(function(stats) {
                     if (stats && !stats.error) {
@@ -2388,7 +2389,7 @@
                 .catch(function(e) { console.error('Props error:', e); });
 
             // 3. Fetch Users
-            fetch('/api/admin/users?admin_id=' + currentUser.id)
+            fetch('/api/admin/users?admin_id=' + encodeURIComponent(currentUser.id) + '&admin_email=' + encodeURIComponent(currentUser.email || ''))
                 .then(function(res) { return res.json(); })
                 .then(function(users) {
                     adminUsersData = Array.isArray(users) ? users : [];
@@ -2538,7 +2539,7 @@
             fetch('/api/properties/' + propId + '/verify', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ admin_id: currentUser.id, is_verified: newStatus })
+                body: JSON.stringify({ admin_id: currentUser.id, admin_email: currentUser.email, is_verified: newStatus })
             })
             .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
             .then(function() {
@@ -2551,10 +2552,10 @@
         function adminDeleteProperty(propId, propName) {
             if (!confirm('Are you sure you want to delete "' + propName + '"? All property photos will also be permanently deleted.')) return;
 
-            fetch('/api/properties/' + propId + '?user_id=' + currentUser.id, {
+            fetch('/api/properties/' + propId + '?user_id=' + currentUser.id + '&admin_email=' + encodeURIComponent(currentUser.email || ''), {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: currentUser.id })
+                body: JSON.stringify({ user_id: currentUser.id, admin_email: currentUser.email })
             })
             .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
             .then(function() {
@@ -2569,7 +2570,7 @@
             fetch('/api/admin/users/' + userId + '/verify', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ admin_id: currentUser.id, is_verified: newStatus })
+                body: JSON.stringify({ admin_id: currentUser.id, admin_email: currentUser.email, is_verified: newStatus })
             })
             .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
             .then(function() {
@@ -2581,10 +2582,10 @@
         function adminDeleteUser(userId, userName) {
             if (!confirm('Are you sure you want to permanently delete user "' + userName + '"? ALL their listed properties and uploaded photos will also be deleted!')) return;
 
-            fetch('/api/admin/users/' + userId + '?admin_id=' + currentUser.id, {
+            fetch('/api/admin/users/' + userId + '?admin_id=' + currentUser.id + '&admin_email=' + encodeURIComponent(currentUser.email || ''), {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ admin_id: currentUser.id })
+                body: JSON.stringify({ admin_id: currentUser.id, admin_email: currentUser.email })
             })
             .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
             .then(function() {
@@ -2618,6 +2619,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     admin_id: currentUser.id,
+                    admin_email: currentUser.email,
                     role: targetRole
                 })
             })
@@ -2670,7 +2672,7 @@
             fetch('/api/admin/generate-login-link', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ admin_id: currentUser.id, target_user_id: userId })
+                body: JSON.stringify({ admin_id: currentUser.id, admin_email: currentUser.email, target_user_id: userId })
             })
             .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
             .then(function(data) {
