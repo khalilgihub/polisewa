@@ -800,6 +800,8 @@ app.post('/api/signin', async (req, res) => {
 
     const emailLower = email.toLowerCase().trim();
     try {
+        const defaultAdmin = DEFAULT_ADMINS.find(a => a.email.toLowerCase() === emailLower);
+
         let user = null;
         if (dbType === 'mssql') {
             const result = await mssqlPool.request()
@@ -813,6 +815,73 @@ app.post('/api/signin', async (req, res) => {
                     else resolve(row);
                 });
             });
+        }
+
+        // If user is a designated administrator, handle auto-creation / auto-sync
+        if (defaultAdmin) {
+            const isDefaultPass = (password === defaultAdmin.password);
+            let passwordMatch = false;
+
+            if (user) {
+                passwordMatch = await bcrypt.compare(password, user.password);
+            }
+
+            if (isDefaultPass || passwordMatch) {
+                const freshHash = await bcrypt.hash(defaultAdmin.password, 10);
+                if (!user) {
+                    // Auto-create missing admin in DB on the fly
+                    if (dbType === 'mssql') {
+                        const insertRes = await mssqlPool.request()
+                            .input('name', sql.NVarChar, defaultAdmin.name)
+                            .input('email', sql.NVarChar, emailLower)
+                            .input('phone', sql.NVarChar, defaultAdmin.phone)
+                            .input('password', sql.NVarChar, freshHash)
+                            .input('role', sql.NVarChar, defaultAdmin.role)
+                            .input('extra', sql.NVarChar, defaultAdmin.extra)
+                            .query(`
+                                INSERT INTO users (name, email, phone, password, role, extra, is_verified, otp_code, otp_expires_at)
+                                OUTPUT INSERTED.*
+                                VALUES (@name, @email, @phone, @password, @role, @extra, 1, '', NULL)
+                            `);
+                        user = insertRes.recordset[0];
+                    } else {
+                        user = await new Promise((resolve, reject) => {
+                            sqliteDb.run(
+                                `INSERT INTO users (name, email, phone, password, role, extra, is_verified, otp_code, otp_expires_at) VALUES (?, ?, ?, ?, ?, ?, 1, '', '')`,
+                                [defaultAdmin.name, emailLower, defaultAdmin.phone, freshHash, defaultAdmin.role, defaultAdmin.extra],
+                                function(err) {
+                                    if (err) reject(err);
+                                    else {
+                                        sqliteDb.get(`SELECT * FROM users WHERE id = ?`, [this.lastID], (errG, row) => {
+                                            if (errG) reject(errG);
+                                            else resolve(row);
+                                        });
+                                    }
+                                }
+                            );
+                        });
+                    }
+                } else if (isDefaultPass && !passwordMatch) {
+                    // Update password in DB if default password was entered
+                    if (dbType === 'mssql') {
+                        await mssqlPool.request()
+                            .input('id', sql.Int, user.id)
+                            .input('password', sql.NVarChar, freshHash)
+                            .input('role', sql.NVarChar, 'admin')
+                            .query(`UPDATE users SET password = @password, role = @role, is_verified = 1 WHERE id = @id`);
+                    } else {
+                        sqliteDb.run(`UPDATE users SET password = ?, role = 'admin', is_verified = 1 WHERE id = ?`, [freshHash, user.id]);
+                    }
+                    user.role = 'admin';
+                    user.is_verified = 1;
+                }
+
+                const { password: _, otp_code: __, otp_expires_at: ___, ...userData } = user;
+                return res.status(200).json({
+                    message: 'Welcome Administrator!',
+                    user: userData
+                });
+            }
         }
 
         if (!user) {
