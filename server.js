@@ -785,12 +785,24 @@ app.post('/api/signin', async (req, res) => {
     }
 });
 
-// GET ALL PROPERTIES
-// GET ALL PROPERTIES
+// GET ALL PROPERTIES (Filtered by approval status: Public sees only approved, Landlords see approved + own pending, Admins see all)
 app.get('/api/properties', async (req, res) => {
+    const rawUserId = req.query.user_id;
+    const userId = rawUserId ? parseInt(rawUserId, 10) : null;
+
     try {
         if (dbType === 'mssql') {
-            const result = await mssqlPool.request().query(`
+            let role = 'guest';
+            if (userId && !isNaN(userId)) {
+                const userRes = await mssqlPool.request()
+                    .input('user_id', sql.Int, userId)
+                    .query('SELECT role FROM users WHERE id = @user_id');
+                if (userRes.recordset.length > 0) {
+                    role = userRes.recordset[0].role;
+                }
+            }
+
+            let query = `
                 SELECT 
                     p.id, 
                     p.user_id, 
@@ -806,14 +818,52 @@ app.get('/api/properties', async (req, res) => {
                     u.role AS landlord_role
                 FROM properties p
                 JOIN users u ON p.user_id = u.id
-            `);
+            `;
+
+            const request = mssqlPool.request();
+            if (role === 'admin') {
+                // Admin sees all listings (approved + pending)
+            } else if (userId && !isNaN(userId)) {
+                // Landlord or student sees all approved listings + their own pending listings
+                query += ` WHERE (p.is_verified = 1 OR p.user_id = @user_id)`;
+                request.input('user_id', sql.Int, userId);
+            } else {
+                // Public guest sees only approved listings
+                query += ` WHERE p.is_verified = 1`;
+            }
+
+            const result = await request.query(query);
             res.status(200).json(result.recordset);
         } else {
-            const sqlQuery = `SELECT properties.*, users.name as landlord_name, users.role as landlord_role FROM properties JOIN users ON properties.user_id = users.id`;
-            sqliteDb.all(sqlQuery, [], (err, rows) => {
-                if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
-                res.json(rows);
-            });
+            const fetchProperties = (role) => {
+                let sqlQuery = `SELECT properties.*, users.name as landlord_name, users.role as landlord_role FROM properties JOIN users ON properties.user_id = users.id`;
+                const params = [];
+
+                if (role === 'admin') {
+                    // Admin sees all listings
+                } else if (userId && !isNaN(userId)) {
+                    // Landlord or user sees approved + their own pending listings
+                    sqlQuery += ` WHERE (properties.is_verified = 1 OR properties.user_id = ?)`;
+                    params.push(userId);
+                } else {
+                    // Public guest sees only approved listings
+                    sqlQuery += ` WHERE properties.is_verified = 1`;
+                }
+
+                sqliteDb.all(sqlQuery, params, (err, rows) => {
+                    if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
+                    res.json(rows);
+                });
+            };
+
+            if (userId && !isNaN(userId)) {
+                sqliteDb.get(`SELECT role FROM users WHERE id = ?`, [userId], (errUser, userRow) => {
+                    const role = (!errUser && userRow) ? userRow.role : 'guest';
+                    fetchProperties(role);
+                });
+            } else {
+                fetchProperties('guest');
+            }
         }
     } catch (err) {
         console.error('Fetch properties error:', err);
@@ -839,7 +889,7 @@ function hasValidPhotos(image) {
     return false;
 }
 
-// CREATE PROPERTY (Max 2 per landlord, unlimited for admin)
+// CREATE PROPERTY (Max 2 per landlord, unlimited for admin. Defaults to pending approval for landlords)
 app.post('/api/properties', async (req, res) => {
     const { user_id, name, desc, price, phone, lat, lng, image } = req.body;
     const trimmedName = name ? String(name).trim() : '';
@@ -857,6 +907,7 @@ app.post('/api/properties', async (req, res) => {
                 .input('user_id', sql.Int, user_id)
                 .query('SELECT role FROM users WHERE id = @user_id');
             const isAdmin = userRes.recordset.length > 0 && userRes.recordset[0].role === 'admin';
+            const initialVerified = isAdmin ? 1 : 0;
 
             if (!isAdmin) {
                 const countRes = await mssqlPool.request()
@@ -876,23 +927,37 @@ app.post('/api/properties', async (req, res) => {
                 .input('lat', sql.Float, lat)
                 .input('lng', sql.Float, lng)
                 .input('image', sql.NVarChar, image || '')
+                .input('is_verified', sql.Int, initialVerified)
                 .query(`
                     INSERT INTO properties (user_id, name, [desc], price, phone, lat, lng, image, is_verified)
                     OUTPUT INSERTED.id
-                    VALUES (@user_id, @name, @desc, @price, @phone, @lat, @lng, @image, 0)
+                    VALUES (@user_id, @name, @desc, @price, @phone, @lat, @lng, @image, @is_verified)
                 `);
 
-            res.status(201).json({ id: result.recordset[0].id, message: 'Property created.' });
+            res.status(201).json({ 
+                id: result.recordset[0].id, 
+                is_verified: initialVerified,
+                message: isAdmin 
+                    ? 'Property created and published.' 
+                    : 'Property submitted! It is pending admin approval and will appear on the map once approved.' 
+            });
         } else {
             sqliteDb.get(`SELECT role FROM users WHERE id = ?`, [user_id], (errUser, userRow) => {
                 if (errUser) return res.status(500).json({ error: 'Database error: ' + errUser.message });
                 const isAdmin = userRow && userRow.role === 'admin';
+                const initialVerified = isAdmin ? 1 : 0;
 
                 const insertProperty = () => {
-                    const sqlQuery = `INSERT INTO properties (user_id, name, desc, price, phone, lat, lng, image, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`;
-                    sqliteDb.run(sqlQuery, [user_id, trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, lat, lng, image || ''], function(err2) {
+                    const sqlQuery = `INSERT INTO properties (user_id, name, desc, price, phone, lat, lng, image, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                    sqliteDb.run(sqlQuery, [user_id, trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, lat, lng, image || '', initialVerified], function(err2) {
                         if (err2) return res.status(500).json({ error: 'Database error: ' + err2.message });
-                        res.status(201).json({ id: this.lastID, message: 'Property created.' });
+                        res.status(201).json({ 
+                            id: this.lastID, 
+                            is_verified: initialVerified,
+                            message: isAdmin 
+                                ? 'Property created and published.' 
+                                : 'Property submitted! It is pending admin approval and will appear on the map once approved.' 
+                        });
                     });
                 };
 
@@ -1080,7 +1145,7 @@ app.patch('/api/properties/:id/verify', async (req, res) => {
                 .query('UPDATE properties SET is_verified = @is_verified WHERE id = @id');
 
             res.status(200).json({
-                message: newStatus === 1 ? 'Listing marked as Polisewa Verified!' : 'Listing verification removed.',
+                message: newStatus === 1 ? 'Listing approved and visible on public map!' : 'Listing hidden from public map (Pending approval).',
                 is_verified: newStatus
             });
         } else {
@@ -1093,7 +1158,7 @@ app.patch('/api/properties/:id/verify', async (req, res) => {
                 sqliteDb.run(`UPDATE properties SET is_verified = ? WHERE id = ?`, [newStatus, id], function(updateErr) {
                     if (updateErr) return res.status(500).json({ error: 'Database error: ' + updateErr.message });
                     res.json({
-                        message: newStatus === 1 ? 'Listing marked as Polisewa Verified!' : 'Listing verification removed.',
+                        message: newStatus === 1 ? 'Listing approved and visible on public map!' : 'Listing hidden from public map (Pending approval).',
                         is_verified: newStatus
                     });
                 });

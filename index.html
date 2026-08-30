@@ -325,8 +325,8 @@
                         </div>
                         <select id="admin-prop-filter" onchange="filterAdminProperties()" class="admin-select">
                             <option value="all">All Listings</option>
-                            <option value="verified">✅ Verified Only</option>
-                            <option value="unverified">⏳ Unverified Only</option>
+                            <option value="verified">✅ Approved Only</option>
+                            <option value="unverified">⏳ Pending Approval Only</option>
                         </select>
                     </div>
 
@@ -799,9 +799,14 @@
         }
 
         function loadProperties() {
-            fetch('/api/properties')
+            var url = '/api/properties';
+            if (currentUser && currentUser.id) {
+                url += '?user_id=' + encodeURIComponent(currentUser.id);
+            }
+            fetch(url)
                 .then(function(res) { return res.json(); })
                 .then(function(properties) {
+                    if (!Array.isArray(properties)) return;
                     for (var i = 0; i < landlordMarkers.length; i++) {
                         if (landlordMarkers[i] && landlordMarkers[i].marker) {
                             map.removeLayer(landlordMarkers[i].marker);
@@ -876,14 +881,22 @@
             popupContent.style.minWidth = '230px';
 
             var verifiedBadgeHtml = isVerified
-                ? "<svg class='verified-seal-icon' width='18' height='18' viewBox='0 0 24 24' fill='none' title='Polisewa Verified'><path fill='#10B981' d='M12 1L15.39 4.39L20.18 4.39L20.18 9.18L23.57 12.57L20.18 15.96L20.18 20.75L15.39 20.75L12 24.14L8.61 20.75L3.82 20.75L3.82 15.96L0.43 12.57L3.82 9.18L3.82 4.39L8.61 4.39L12 1Z'/><path stroke='#ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='M8.5 12.5L11 15L16.5 9.5'/></svg>"
+                ? "<svg class='verified-seal-icon' width='18' height='18' viewBox='0 0 24 24' fill='none' title='Polisewa Approved'><path fill='#10B981' d='M12 1L15.39 4.39L20.18 4.39L20.18 9.18L23.57 12.57L20.18 15.96L20.18 20.75L15.39 20.75L12 24.14L8.61 20.75L3.82 20.75L3.82 15.96L0.43 12.57L3.82 9.18L3.82 4.39L8.61 4.39L12 1Z'/><path stroke='#ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='M8.5 12.5L11 15L16.5 9.5'/></svg>"
                 : "";
 
             var actionsHtml = '';
             if (isAdmin) {
+                var statusHtml = isVerified
+                    ? "<span style='display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;'>✅ Approved & Live</span>"
+                    : "<span style='display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;border:1px solid #fde68a;'>⏳ Pending Approval</span>";
+
                 actionsHtml = "<div style='margin-top:10px;display:flex;flex-direction:column;gap:6px;'>" +
+                    "<div style='display:flex;align-items:center;justify-content:space-between;padding:2px 0;'>" +
+                        "<span style='font-size:11.5px;color:#64748b;font-weight:600;'>Visibility:</span>" +
+                        statusHtml +
+                    "</div>" +
                     "<button class='admin-verify-btn " + (isVerified ? "btn-unverify" : "btn-verify") + "' id='popup-verify-btn-" + data.id + "'>" +
-                        (isVerified ? "✕ Revoke Verification" : "✓ Verify Listing") +
+                        (isVerified ? "✕ Hide from Map (Unapprove)" : "✓ Approve & Publish Pin") +
                     "</button>" +
                     "<div style='display:flex;gap:6px;'>" +
                         "<button class='edit-pin-btn' style='flex:1;padding:6px 10px;font-size:11.5px;font-weight:600;cursor:pointer;background:#2563eb;color:white;border:none;border-radius:8px;'>Edit</button>" +
@@ -892,9 +905,17 @@
                     "</div>" +
                     "</div>";
             } else if (isOwner) {
-                actionsHtml = "<div style='margin-top:10px;display:flex;gap:8px;'>" +
-                    "<button class='edit-pin-btn' style='flex:1;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#2563eb;color:white;border:none;border-radius:8px;box-shadow:0 2px 6px rgba(37,99,235,0.3);'>Edit Listing</button>" +
-                    "<button class='remove-pin-btn' style='padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#fee2e2;color:#ef4444;border:none;border-radius:8px;'>Delete</button>" +
+                var pendingNotice = !isVerified
+                    ? "<div style='background:#fffbeb;color:#b45309;padding:6px 9px;border-radius:8px;font-size:11px;font-weight:600;margin-top:6px;border:1px solid #fde68a;line-height:1.35;'>" +
+                        "⏳ <b>Pending Admin Approval</b>" +
+                        "<div style='font-size:10px;font-weight:400;color:#92400e;margin-top:2px;'>Visible only to you until approved by admin.</div>" +
+                      "</div>"
+                    : "";
+
+                actionsHtml = pendingNotice +
+                    "<div style='margin-top:10px;display:flex;gap:8px;'>" +
+                        "<button class='edit-pin-btn' style='flex:1;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#2563eb;color:white;border:none;border-radius:8px;box-shadow:0 2px 6px rgba(37,99,235,0.3);'>Edit Listing</button>" +
+                        "<button class='remove-pin-btn' style='padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#fee2e2;color:#ef4444;border:none;border-radius:8px;'>Delete</button>" +
                     "</div>";
             } else {
                 actionsHtml = "<div style='margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:6px;'>" +
@@ -1026,10 +1047,10 @@
                 }
             })
             .catch(function(err) {
-                alert('Verification error: ' + err.message);
+                alert('Approval error: ' + err.message);
                 if (clickedBtn) {
                     clickedBtn.disabled = false;
-                    clickedBtn.innerText = target.is_verified === 1 ? '🛡️ Revoke Verification' : '✅ Verify Listing';
+                    clickedBtn.innerText = target.is_verified === 1 ? '✕ Hide from Map (Unapprove)' : '✓ Approve & Publish Pin';
                 }
             });
         }
@@ -1170,7 +1191,9 @@
                 phoneInput.disabled = true;
                 var infoHtml = '<div class="landlord-view-card">';
                 if (data.is_verified === 1) {
-                    infoHtml += '<div class="panel-verified-banner"><span class="banner-badge"><svg class="verified-seal-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"><path fill="#10B981" d="M12 1L15.39 4.39L20.18 4.39L20.18 9.18L23.57 12.57L20.18 15.96L20.18 20.75L15.39 20.75L12 24.14L8.61 20.75L3.82 20.75L3.82 15.96L0.43 12.57L3.82 9.18L3.82 4.39L8.61 4.39L12 1Z"/><path stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M8.5 12.5L11 15L16.5 9.5"/></svg> Polisewa Verified Listing</span><span class="banner-sub">Inspected & Verified by Admin</span></div>';
+                    infoHtml += '<div class="panel-verified-banner"><span class="banner-badge"><svg class="verified-seal-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"><path fill="#10B981" d="M12 1L15.39 4.39L20.18 4.39L20.18 9.18L23.57 12.57L20.18 15.96L20.18 20.75L15.39 20.75L12 24.14L8.61 20.75L3.82 20.75L3.82 15.96L0.43 12.57L3.82 9.18L3.82 4.39L8.61 4.39L12 1Z"/><path stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M8.5 12.5L11 15L16.5 9.5"/></svg> Approved Listing</span><span class="banner-sub">Published on Polisewa Map</span></div>';
+                } else if (currentUser && currentUser.id === data.user_id) {
+                    infoHtml += '<div style="background:#fffbeb;border:1px solid #fde68a;color:#b45309;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-size:12px;font-weight:600;"><span style="font-size:14px;">⏳</span> <b>Pending Admin Approval</b><div style="font-weight:400;color:#92400e;margin-top:2px;">This listing is under review and not yet visible to students on the public map.</div></div>';
                 }
                 if (data.landlord_name) {
                     infoHtml += '<div class="landlord-view-header"><span class="landlord-badge">🔑 Landlord</span> <span class="landlord-name">' + data.landlord_name + '</span></div>';
@@ -1180,10 +1203,10 @@
                 }
                 if (currentUser && currentUser.role === 'admin') {
                     infoHtml += '<div class="panel-admin-box">' +
-                        '<div class="admin-box-title">🛡️ Admin Quick Controls</div>' +
+                        '<div class="admin-box-title">🛡️ Admin Controls</div>' +
                         '<div class="admin-box-actions">' +
                             '<button type="button" class="admin-toggle-btn ' + (data.is_verified === 1 ? 'btn-unverify' : 'btn-verify') + '" onclick="togglePropertyVerification(' + data.id + ', ' + index + ')">' +
-                                (data.is_verified === 1 ? 'Revoke Verified Status' : 'Mark as Verified') +
+                                (data.is_verified === 1 ? '✕ Hide from Map (Unapprove)' : '✓ Approve & Publish to Map') +
                             '</button>' +
                             '<button type="button" class="admin-edit-btn" onclick="openPropertyPanel(\'edit\', ' + index + ')">Edit Property</button>' +
                         '</div>' +
@@ -1290,7 +1313,10 @@
                             pendingMarker = null;
                         }
 
-                        var newMarker = L.marker([pendingLatLng.lat, pendingLatLng.lng]).addTo(map);
+                        var isVerified = result.is_verified !== undefined
+                            ? result.is_verified
+                            : (currentUser && currentUser.role === 'admin' ? 1 : 0);
+
                         var propertyData = {
                             id: result.id,
                             user_id: currentUser.id,
@@ -1300,6 +1326,7 @@
                             price: price,
                             phone: phone,
                             landlord_name: currentUser.name,
+                            is_verified: isVerified,
                             lat: pendingLatLng.lat,
                             lng: pendingLatLng.lng,
                             image: finalImageStr
@@ -1316,6 +1343,10 @@
                         saveBtn.disabled = false;
                         saveBtn.innerText = originalText;
                         closePropertyPanel();
+
+                        if (result.message) {
+                            alert(result.message);
+                        }
 
                         // Automatically pan to new marker and open its popup square
                         setTimeout(function() {
@@ -1619,7 +1650,9 @@
                     var div = document.createElement('div');
                     div.className = 'result-item';
 
-                    var verifiedTag = prop.is_verified === 1 ? '<svg class="verified-seal-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" title="Polisewa Verified"><path fill="#10B981" d="M12 1L15.39 4.39L20.18 4.39L20.18 9.18L23.57 12.57L20.18 15.96L20.18 20.75L15.39 20.75L12 24.14L8.61 20.75L3.82 20.75L3.82 15.96L0.43 12.57L3.82 9.18L3.82 4.39L8.61 4.39L12 1Z"/><path stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M8.5 12.5L11 15L16.5 9.5"/></svg>' : '';
+                    var verifiedTag = prop.is_verified === 1
+                        ? '<svg class="verified-seal-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" title="Polisewa Approved"><path fill="#10B981" d="M12 1L15.39 4.39L20.18 4.39L20.18 9.18L23.57 12.57L20.18 15.96L20.18 20.75L15.39 20.75L12 24.14L8.61 20.75L3.82 20.75L3.82 15.96L0.43 12.57L3.82 9.18L3.82 4.39L8.61 4.39L12 1Z"/><path stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M8.5 12.5L11 15L16.5 9.5"/></svg>'
+                        : '<span style="font-size:10px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;border:1px solid #fde68a;">Pending</span>';
                     var priceTag = prop.price ? '<span class="result-price-badge">RM ' + escapeHtml(prop.price) + '/mo</span>' : '';
                     var descSnippet = prop.desc ? escapeHtml(prop.desc) : 'No description';
                     var landlordTag = prop.landlord_name ? ' • 🔑 ' + escapeHtml(prop.landlord_name) : '';
@@ -2270,7 +2303,7 @@
                 .catch(function(e) { console.error('Stats error:', e); });
 
             // 2. Fetch Properties
-            fetch('/api/properties')
+            fetch('/api/properties?user_id=' + encodeURIComponent(currentUser.id))
                 .then(function(res) { return res.json(); })
                 .then(function(props) {
                     adminPropertiesData = Array.isArray(props) ? props : [];
@@ -2343,8 +2376,8 @@
                     '</td>' +
                     '<td><span class="admin-price-badge">RM ' + escapeHtml(p.price || '0') + '/mo</span></td>' +
                     '<td>' +
-                        '<button class="admin-status-toggle ' + (isVer ? 'status-verified' : 'status-unverified') + '" onclick="adminTogglePropertyVerify(' + p.id + ', ' + (isVer ? 1 : 0) + ')">' +
-                            (isVer ? '✓ Verified' : '⏳ Unverified') +
+                        '<button class="admin-status-toggle ' + (isVer ? 'status-verified' : 'status-unverified') + '" onclick="adminTogglePropertyVerify(' + p.id + ', ' + (isVer ? 1 : 0) + ')" title="' + (isVer ? 'Click to hide from map' : 'Click to approve and publish') + '">' +
+                            (isVer ? '✓ Approved' : '⏳ Pending') +
                         '</button>' +
                     '</td>' +
                     '<td style="text-align:right;">' +
