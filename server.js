@@ -7,6 +7,8 @@ const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
 
+const { poolPromise, sql } = require('./db');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -147,33 +149,16 @@ let mssqlPool = null;
 let sqliteDb = null;
 let sql = null;
 
+// Database Abstraction using db.js (With Automatic Failover)
 async function initDatabase() {
-    if (process.env.DB_SERVER) {
-        try {
-            sql = require('mssql');
-            const dbConfig = {
-                server: process.env.DB_SERVER,
-                database: process.env.DB_DATABASE,
-                user: process.env.DB_USER,
-                password: process.env.DB_PASSWORD,
-                port: parseInt(process.env.DB_PORT, 10) || 1433,
-                options: {
-                    encrypt: true, // Required for Azure SQL Database
-                    trustServerCertificate: false,
-                    connectTimeout: 15000
-                }
-            };
-            mssqlPool = await new sql.ConnectionPool(dbConfig).connect();
-            dbType = 'mssql';
-            console.log(`✅ Connected to Azure SQL Database (${process.env.DB_SERVER}) successfully.`);
-            await initMssqlTables(mssqlPool);
-            return;
-        } catch (err) {
-            console.error('⚠️ Azure SQL Connection failed:', err.message);
-            console.log('Falling back to local SQLite database...');
-        }
+    try {
+        mssqlPool = await poolPromise;
+        dbType = 'mssql';
+        console.log('✅ Pangkalan data Azure SQL bersedia (Auto-Failover Aktif).');
+        await initMssqlTables(mssqlPool);
+    } catch (err) {
+        console.error('⚠️ Sambungan pangkalan data gagal:', err.message);
     }
-    initSqlite();
 }
 
 function initSqlite() {
@@ -396,13 +381,13 @@ function initSqliteTables() {
                     if (cols) {
                         const colNames = cols.map(c => c.name);
                         if (!colNames.includes('is_verified')) {
-                            sqliteDb.run(`ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0`, () => {});
+                            sqliteDb.run(`ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0`, () => { });
                         }
                         if (!colNames.includes('otp_code')) {
-                            sqliteDb.run(`ALTER TABLE users ADD COLUMN otp_code TEXT DEFAULT ''`, () => {});
+                            sqliteDb.run(`ALTER TABLE users ADD COLUMN otp_code TEXT DEFAULT ''`, () => { });
                         }
                         if (!colNames.includes('otp_expires_at')) {
-                            sqliteDb.run(`ALTER TABLE users ADD COLUMN otp_expires_at TEXT DEFAULT ''`, () => {});
+                            sqliteDb.run(`ALTER TABLE users ADD COLUMN otp_expires_at TEXT DEFAULT ''`, () => { });
                         }
                     }
                     seedAdminAccounts();
@@ -434,10 +419,10 @@ function initSqliteTables() {
                     if (cols) {
                         const colNames = cols.map(c => c.name);
                         if (!colNames.includes('image')) {
-                            sqliteDb.run(`ALTER TABLE properties ADD COLUMN image TEXT DEFAULT ''`, () => {});
+                            sqliteDb.run(`ALTER TABLE properties ADD COLUMN image TEXT DEFAULT ''`, () => { });
                         }
                         if (!colNames.includes('is_verified')) {
-                            sqliteDb.run(`ALTER TABLE properties ADD COLUMN is_verified INTEGER DEFAULT 0`, () => {});
+                            sqliteDb.run(`ALTER TABLE properties ADD COLUMN is_verified INTEGER DEFAULT 0`, () => { });
                         }
                     }
                 });
@@ -762,7 +747,7 @@ app.post('/api/signin', async (req, res) => {
 
             try {
                 await sendOtpEmail(emailLower, otpCode, user.name);
-            } catch (e) {}
+            } catch (e) { }
 
             return res.status(403).json({
                 error: 'Your email address is not verified yet. We have sent a verification code to your email.',
@@ -887,7 +872,7 @@ app.post('/api/properties', async (req, res) => {
 
                 const insertProperty = () => {
                     const sqlQuery = `INSERT INTO properties (user_id, name, desc, price, phone, lat, lng, image, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`;
-                    sqliteDb.run(sqlQuery, [user_id, trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, lat, lng, image || ''], function(err2) {
+                    sqliteDb.run(sqlQuery, [user_id, trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, lat, lng, image || ''], function (err2) {
                         if (err2) return res.status(500).json({ error: 'Database error: ' + err2.message });
                         res.status(201).json({ id: this.lastID, message: 'Property created.' });
                     });
@@ -962,7 +947,7 @@ app.put('/api/properties/:id', async (req, res) => {
                     ? [trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, image || '', id]
                     : [trimmedName, trimmedDesc, trimmedPrice, trimmedPhone, image || '', id, user_id];
 
-                sqliteDb.run(sqlQuery, params, function(err) {
+                sqliteDb.run(sqlQuery, params, function (err) {
                     if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
                     if (this.changes === 0) return res.status(404).json({ error: 'Property not found or not owned by you.' });
                     res.json({ message: 'Property updated successfully.' });
@@ -996,11 +981,11 @@ app.delete('/api/properties/:id', async (req, res) => {
                     const urls = Array.isArray(parsed) ? parsed : [parsed];
                     urls.forEach(u => {
                         const fp = path.join(UPLOAD_DIR, path.basename(u));
-                        try { fs.unlinkSync(fp); } catch(e) {}
+                        try { fs.unlinkSync(fp); } catch (e) { }
                     });
-                } catch(e) {
+                } catch (e) {
                     const fp = path.join(UPLOAD_DIR, path.basename(propRes.recordset[0].image));
-                    try { fs.unlinkSync(fp); } catch(e) {}
+                    try { fs.unlinkSync(fp); } catch (e) { }
                 }
             }
 
@@ -1027,11 +1012,11 @@ app.delete('/api/properties/:id', async (req, res) => {
                             const urls = Array.isArray(parsed) ? parsed : [parsed];
                             urls.forEach(u => {
                                 const fp = path.join(UPLOAD_DIR, path.basename(u));
-                                try { fs.unlinkSync(fp); } catch(e) {}
+                                try { fs.unlinkSync(fp); } catch (e) { }
                             });
-                        } catch(e) {
+                        } catch (e) {
                             const fp = path.join(UPLOAD_DIR, path.basename(propRow.image));
-                            try { fs.unlinkSync(fp); } catch(e) {}
+                            try { fs.unlinkSync(fp); } catch (e) { }
                         }
                     }
 
@@ -1040,7 +1025,7 @@ app.delete('/api/properties/:id', async (req, res) => {
                         : `DELETE FROM properties WHERE id = ? AND user_id = ?`;
                     const params = isAdmin ? [id] : [id, user_id];
 
-                    sqliteDb.run(sqlQuery, params, function(err) {
+                    sqliteDb.run(sqlQuery, params, function (err) {
                         if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
                         if (this.changes === 0) return res.status(404).json({ error: 'Property not found or not owned by you.' });
                         res.json({ message: 'Property deleted successfully.' });
@@ -1087,7 +1072,7 @@ app.patch('/api/properties/:id/verify', async (req, res) => {
                     return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
                 }
 
-                sqliteDb.run(`UPDATE properties SET is_verified = ? WHERE id = ?`, [newStatus, id], function(updateErr) {
+                sqliteDb.run(`UPDATE properties SET is_verified = ? WHERE id = ?`, [newStatus, id], function (updateErr) {
                     if (updateErr) return res.status(500).json({ error: 'Database error: ' + updateErr.message });
                     res.json({
                         message: newStatus === 1 ? 'Listing marked as Polisewa Verified!' : 'Listing verification removed.',
@@ -1237,11 +1222,11 @@ app.delete('/api/admin/users/:id', async (req, res) => {
                         const urls = Array.isArray(parsed) ? parsed : [parsed];
                         urls.forEach(u => {
                             const fp = path.join(UPLOAD_DIR, path.basename(u));
-                            try { fs.unlinkSync(fp); } catch(e) {}
+                            try { fs.unlinkSync(fp); } catch (e) { }
                         });
-                    } catch(e) {
+                    } catch (e) {
                         const fp = path.join(UPLOAD_DIR, path.basename(row.image));
-                        try { fs.unlinkSync(fp); } catch(e) {}
+                        try { fs.unlinkSync(fp); } catch (e) { }
                     }
                 }
             });
@@ -1266,11 +1251,11 @@ app.delete('/api/admin/users/:id', async (req, res) => {
                                     const urls = Array.isArray(parsed) ? parsed : [parsed];
                                     urls.forEach(u => {
                                         const fp = path.join(UPLOAD_DIR, path.basename(u));
-                                        try { fs.unlinkSync(fp); } catch(e) {}
+                                        try { fs.unlinkSync(fp); } catch (e) { }
                                     });
-                                } catch(e) {
+                                } catch (e) {
                                     const fp = path.join(UPLOAD_DIR, path.basename(row.image));
-                                    try { fs.unlinkSync(fp); } catch(e) {}
+                                    try { fs.unlinkSync(fp); } catch (e) { }
                                 }
                             }
                         });
@@ -1322,7 +1307,7 @@ app.patch('/api/admin/users/:id/verify', async (req, res) => {
                     return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
                 }
 
-                sqliteDb.run(`UPDATE users SET is_verified = ? WHERE id = ?`, [newStatus, id], function(errUpdate) {
+                sqliteDb.run(`UPDATE users SET is_verified = ? WHERE id = ?`, [newStatus, id], function (errUpdate) {
                     if (errUpdate) return res.status(500).json({ error: 'Database error: ' + errUpdate.message });
                     res.json({ message: `User verification updated to ${newStatus === 1 ? 'Verified' : 'Unverified'}.`, is_verified: newStatus });
                 });
@@ -1360,11 +1345,11 @@ app.delete('/api/user', async (req, res) => {
                         const urls = Array.isArray(parsed) ? parsed : [parsed];
                         urls.forEach(u => {
                             const fp = path.join(UPLOAD_DIR, path.basename(u));
-                            try { fs.unlinkSync(fp); } catch(e) {}
+                            try { fs.unlinkSync(fp); } catch (e) { }
                         });
-                    } catch(e) {
+                    } catch (e) {
                         const fp = path.join(UPLOAD_DIR, path.basename(row.image));
-                        try { fs.unlinkSync(fp); } catch(e) {}
+                        try { fs.unlinkSync(fp); } catch (e) { }
                     }
                 }
             });
@@ -1400,11 +1385,11 @@ app.delete('/api/user', async (req, res) => {
                                     const urls = Array.isArray(parsed) ? parsed : [parsed];
                                     urls.forEach(u => {
                                         const fp = path.join(UPLOAD_DIR, path.basename(u));
-                                        try { fs.unlinkSync(fp); } catch(e) {}
+                                        try { fs.unlinkSync(fp); } catch (e) { }
                                     });
-                                } catch(e) {
+                                } catch (e) {
                                     const fp = path.join(UPLOAD_DIR, path.basename(row.image));
-                                    try { fs.unlinkSync(fp); } catch(e) {}
+                                    try { fs.unlinkSync(fp); } catch (e) { }
                                 }
                             }
                         });
