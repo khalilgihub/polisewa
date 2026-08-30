@@ -350,16 +350,6 @@
 
                 <!-- Tab 2: Users Management -->
                 <div id="admin-tab-users" class="admin-tab-content" style="display:none;">
-                    <div class="admin-quick-actions-bar">
-                        <span class="admin-quick-title">⚡ Instant Test Accounts:</span>
-                        <button type="button" class="btn-quick-create btn-quick-landlord" onclick="adminQuickCreateTestUser('landlord')">
-                            <span>🔑 + Quick Test Landlord</span>
-                        </button>
-                        <button type="button" class="btn-quick-create btn-quick-student" onclick="adminQuickCreateTestUser('student')">
-                            <span>🎓 + Quick Test Student</span>
-                        </button>
-                    </div>
-
                     <div class="admin-filters-row">
                         <div class="admin-search-wrapper">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -389,46 +379,6 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Test User Created Modal -->
-        <div id="test-user-modal-overlay" class="modal-overlay" style="z-index: 100000;">
-            <div class="modal-card" style="max-width: 440px;">
-                <button class="close-btn" onclick="closeTestUserModal()" aria-label="Close">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-                <div class="modal-header">
-                    <div style="font-size: 32px; margin-bottom: 6px;">🎉</div>
-                    <h2 id="test-user-modal-title">Test Account Ready!</h2>
-                    <p>Pre-verified account created. Ready to use immediately.</p>
-                </div>
-                <div class="test-user-cred-box" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px; margin: 16px 0; font-size:13px; line-height:1.6;">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-                        <span style="color:#64748b; font-weight:600;">Role:</span>
-                        <span id="test-cred-role" style="font-weight:700;">Landlord</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-                        <span style="color:#64748b; font-weight:600;">Name:</span>
-                        <span id="test-cred-name" style="font-weight:700;">Test Landlord</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-                        <span style="color:#64748b; font-weight:600;">Email:</span>
-                        <span id="test-cred-email" style="font-weight:700; color:#2563eb;">email@test.polisewa</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between;">
-                        <span style="color:#64748b; font-weight:600;">Password:</span>
-                        <span id="test-cred-pass" style="font-weight:700; color:#059669; font-family:monospace; font-size:14px;">TestPass123!</span>
-                    </div>
-                </div>
-                <div style="display:flex; flex-direction:column; gap:8px;">
-                    <button id="test-cred-open-btn" class="submit-btn" style="background:#2563eb; color:white; font-weight:700;" onclick="openTestUserInNewTab()">
-                        🚀 Open in New Tab & Auto-Login
-                    </button>
-                    <button class="submit-btn" style="background:#f1f5f9; color:#334155; font-weight:600; border:1px solid #cbd5e1;" onclick="copyTestUserCreds()">
-                        📋 Copy Login Credentials
-                    </button>
                 </div>
             </div>
         </div>
@@ -1844,40 +1794,14 @@
         var deleteModalOverlay = document.getElementById("delete-modal-overlay");
         var adminModalOverlay = document.getElementById("admin-modal-overlay");
 
-        // Check for 1-click Auto-Login from URL query (?autologin=<token>)
-        var urlParams = new URLSearchParams(window.location.search);
-        var autoLoginToken = urlParams.get('autologin');
-        if (autoLoginToken) {
-            fetch('/api/auth/autologin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: autoLoginToken })
-            })
-            .then(function(res) { return res.json(); })
-            .then(function(data) {
-                if (data && data.user) {
-                    currentUser = data.user;
-                    localStorage.setItem('polisewa_user', JSON.stringify(data.user));
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                    updateAuthButton();
-                    loadProperties();
-                } else if (data && data.error) {
-                    alert('Auto-login notice: ' + data.error);
-                }
-            })
-            .catch(function(err) {
-                console.error('Autologin error:', err);
-            });
-        } else {
-            // Restore user session from localStorage on page load
-            var savedSession = null;
-            try {
-                savedSession = JSON.parse(localStorage.getItem('polisewa_user') || 'null');
-            } catch(e) { savedSession = null; }
-            if (savedSession && savedSession.id) {
-                currentUser = savedSession;
-                updateAuthButton();
-            }
+        // Restore user session from localStorage on page load
+        var savedSession = null;
+        try {
+            savedSession = JSON.parse(localStorage.getItem('polisewa_user') || 'null');
+        } catch(e) { savedSession = null; }
+        if (savedSession && savedSession.id) {
+            currentUser = savedSession;
+            updateAuthButton();
         }
 
         authBtn.onclick = function () {
@@ -2524,12 +2448,9 @@
                     '</td>' +
                     '<td><span style="font-weight:600; font-size:13px; color:#334155;">' + (u.property_count || 0) + '</span></td>' +
                     '<td style="text-align:right;">' +
-                        '<div class="admin-action-btns">' +
-                            (!isSelf
-                                ? '<button class="admin-tbl-btn admin-tbl-open" title="Open and Auto-Login in New Tab" onclick="adminOpenUserInNewTab(' + u.id + ')">🚀 New Tab</button>' +
-                                  '<button class="admin-tbl-btn admin-tbl-delete" title="Delete User Account" onclick="adminDeleteUser(' + u.id + ', \'' + escapeHtml(u.name).replace(/'/g, "\\'") + '\')">🗑️</button>'
-                                : '<span style="font-size:12px;color:#94a3b8;padding:5px;">Protected</span>') +
-                        '</div>' +
+                        (!isSelf
+                            ? '<button class="admin-tbl-btn admin-tbl-delete" title="Delete User Account" onclick="adminDeleteUser(' + u.id + ', \'' + escapeHtml(u.name).replace(/'/g, "\\'") + '\')">🗑️ Delete</button>'
+                            : '<span style="font-size:12px;color:#94a3b8;padding:5px;">Protected</span>') +
                     '</td>' +
                 '</tr>';
             });
@@ -2606,87 +2527,6 @@
                     found.marker.openPopup();
                 }
             }, 600);
-        }
-
-        var activeTestUserCreds = null;
-
-        function adminQuickCreateTestUser(role) {
-            if (!currentUser || currentUser.role !== 'admin') return;
-
-            var targetRole = role === 'landlord' ? 'landlord' : 'student';
-            var roleLabel = targetRole === 'landlord' ? 'Landlord' : 'Student';
-
-            fetch('/api/admin/create-test-user', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    admin_id: currentUser.id,
-                    admin_email: currentUser.email,
-                    role: targetRole
-                })
-            })
-            .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
-            .then(function(data) {
-                activeTestUserCreds = {
-                    name: data.credentials.name,
-                    email: data.credentials.email,
-                    password: data.credentials.password,
-                    role: roleLabel,
-                    autologinUrl: data.autologinUrl
-                };
-
-                document.getElementById('test-user-modal-title').innerText = '🎉 ' + roleLabel + ' Test Account Ready!';
-                document.getElementById('test-cred-role').innerText = (targetRole === 'landlord' ? '🔑 Landlord' : '🎓 Student');
-                document.getElementById('test-cred-name').innerText = data.credentials.name;
-                document.getElementById('test-cred-email').innerText = data.credentials.email;
-                document.getElementById('test-cred-pass').innerText = data.credentials.password;
-
-                document.getElementById('test-user-modal-overlay').classList.add('active');
-
-                loadAdminData();
-            })
-            .catch(function(err) {
-                alert('Failed to create test user: ' + err.message);
-            });
-        }
-
-        function closeTestUserModal() {
-            document.getElementById('test-user-modal-overlay').classList.remove('active');
-        }
-
-        function openTestUserInNewTab() {
-            if (!activeTestUserCreds || !activeTestUserCreds.autologinUrl) return;
-            window.open(activeTestUserCreds.autologinUrl, '_blank');
-        }
-
-        function copyTestUserCreds() {
-            if (!activeTestUserCreds) return;
-            var text = "PoliSewa Test Account (" + activeTestUserCreds.role + ")\n" +
-                "Email: " + activeTestUserCreds.email + "\n" +
-                "Password: " + activeTestUserCreds.password;
-            navigator.clipboard.writeText(text)
-                .then(function() { alert('Login credentials copied to clipboard!'); })
-                .catch(function() { prompt('Copy credentials below:', text); });
-        }
-
-        function adminOpenUserInNewTab(userId) {
-            if (!currentUser || currentUser.role !== 'admin') return;
-            fetch('/api/admin/generate-login-link', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ admin_id: currentUser.id, admin_email: currentUser.email, target_user_id: userId })
-            })
-            .then(function(res) { return res.json().then(function(d) { if (!res.ok) throw new Error(d.error); return d; }); })
-            .then(function(data) {
-                if (data.autologinUrl) {
-                    window.open(data.autologinUrl, '_blank');
-                } else {
-                    alert(data.error || 'Failed to generate login link.');
-                }
-            })
-            .catch(function(err) {
-                alert('Error: ' + err.message);
-            });
         }
     </script>
 </body>
