@@ -2744,6 +2744,71 @@ textarea {
     color: #dc2626;
 }
 
+.admin-tbl-open {
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+}
+
+.admin-tbl-open:hover {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+/* Quick Test Account Bar in Admin Console */
+.admin-quick-actions-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.admin-quick-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #475569;
+}
+
+.btn-quick-create {
+    padding: 7px 13px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.btn-quick-landlord {
+    background: #eff6ff;
+    color: #2563eb;
+    border-color: #bfdbfe;
+}
+
+.btn-quick-landlord:hover {
+    background: #dbeafe;
+    transform: translateY(-1px);
+}
+
+.btn-quick-student {
+    background: #f0fdf4;
+    color: #16a34a;
+    border-color: #bbf7d0;
+}
+
+.btn-quick-student:hover {
+    background: #dcfce7;
+    transform: translateY(-1px);
+}
+
 @media (max-width: 768px) {
     .modal-card-lg {
         padding: 20px 14px;
@@ -2755,6 +2820,5 @@ textarea {
         grid-template-columns: repeat(2, 1fr);
         gap: 8px;
     }
-
 }
 

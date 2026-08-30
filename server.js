@@ -6,9 +6,22 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// In-memory token store for quick admin test auto-login in new tabs
+const quickLoginTokens = new Map();
+
+function generateQuickLoginToken(userId) {
+    const token = crypto.randomBytes(24).toString('hex');
+    quickLoginTokens.set(token, {
+        userId: userId,
+        expiresAt: Date.now() + 60 * 60 * 1000 // 1 hour validity
+    });
+    return token;
+}
 
 // Gmail SMTP Email Transporter
 function getMailTransporter() {
@@ -1398,6 +1411,170 @@ app.patch('/api/admin/users/:id/verify', async (req, res) => {
         }
     } catch (err) {
         console.error('Admin user verify error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// ADMIN: CREATE PRE-VERIFIED TEST USER (Landlord or Student)
+app.post('/api/admin/create-test-user', async (req, res) => {
+    const { admin_id, role, custom_name, custom_email, custom_password } = req.body;
+    if (!admin_id) return res.status(401).json({ error: 'Admin ID required.' });
+    const targetRole = (role === 'landlord') ? 'landlord' : 'student';
+
+    try {
+        if (dbType === 'mssql') {
+            const adminCheck = await mssqlPool.request()
+                .input('admin_id', sql.Int, admin_id)
+                .query('SELECT role FROM users WHERE id = @admin_id');
+            if (adminCheck.recordset.length === 0 || adminCheck.recordset[0].role !== 'admin') {
+                return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+            }
+        } else {
+            const adminUser = await new Promise((resolve) => {
+                sqliteDb.get(`SELECT role FROM users WHERE id = ?`, [admin_id], (err, row) => resolve(row));
+            });
+            if (!adminUser || adminUser.role !== 'admin') {
+                return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+            }
+        }
+
+        const randId = Math.floor(100 + Math.random() * 900);
+        const name = custom_name || (targetRole === 'landlord' ? `Test Landlord ${randId}` : `Test Student ${randId}`);
+        const email = (custom_email || `${targetRole}_${randId}@test.polisewa`).toLowerCase().trim();
+        const plainPassword = custom_password || 'TestPass123!';
+        const phone = '012' + Math.floor(1000000 + Math.random() * 9000000);
+        const extra = targetRole === 'landlord' ? 'Test Property Agency' : 'Politeknik Kuching Sarawak';
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(plainPassword, salt);
+
+        let createdUserId = null;
+
+        if (dbType === 'mssql') {
+            const insertRes = await mssqlPool.request()
+                .input('name', sql.NVarChar, name)
+                .input('email', sql.NVarChar, email)
+                .input('phone', sql.NVarChar, phone)
+                .input('password', sql.NVarChar, hashedPassword)
+                .input('role', sql.NVarChar, targetRole)
+                .input('extra', sql.NVarChar, extra)
+                .query(`
+                    INSERT INTO users (name, email, phone, password, role, extra, is_verified, otp_code, otp_expires_at)
+                    OUTPUT INSERTED.id
+                    VALUES (@name, @email, @phone, @password, @role, @extra, 1, '', NULL)
+                `);
+            createdUserId = insertRes.recordset[0].id;
+        } else {
+            createdUserId = await new Promise((resolve, reject) => {
+                sqliteDb.run(
+                    `INSERT INTO users (name, email, phone, password, role, extra, is_verified, otp_code, otp_expires_at) VALUES (?, ?, ?, ?, ?, ?, 1, '', '')`,
+                    [name, email, phone, hashedPassword, targetRole, extra],
+                    function (err) {
+                        if (err) reject(err);
+                        else resolve(this.lastID);
+                    }
+                );
+            });
+        }
+
+        const autologinToken = generateQuickLoginToken(createdUserId);
+        const userObj = {
+            id: createdUserId,
+            name: name,
+            email: email,
+            phone: phone,
+            role: targetRole,
+            extra: extra,
+            is_verified: 1
+        };
+
+        res.status(201).json({
+            message: `Instant ${targetRole} test account created!`,
+            user: userObj,
+            credentials: {
+                name: name,
+                email: email,
+                password: plainPassword,
+                role: targetRole
+            },
+            autologinUrl: `/?autologin=${autologinToken}`
+        });
+    } catch (err) {
+        console.error('Create test user error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
+});
+
+// ADMIN: GENERATE 1-CLICK LOGIN LINK FOR ANY USER (Open in New Tab)
+app.post('/api/admin/generate-login-link', async (req, res) => {
+    const { admin_id, target_user_id } = req.body;
+    if (!admin_id || !target_user_id) return res.status(400).json({ error: 'admin_id and target_user_id required.' });
+
+    try {
+        if (dbType === 'mssql') {
+            const adminCheck = await mssqlPool.request()
+                .input('admin_id', sql.Int, admin_id)
+                .query('SELECT role FROM users WHERE id = @admin_id');
+            if (adminCheck.recordset.length === 0 || adminCheck.recordset[0].role !== 'admin') {
+                return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+            }
+        } else {
+            const adminUser = await new Promise((resolve) => {
+                sqliteDb.get(`SELECT role FROM users WHERE id = ?`, [admin_id], (err, row) => resolve(row));
+            });
+            if (!adminUser || adminUser.role !== 'admin') {
+                return res.status(403).json({ error: 'Unauthorized. Admin privileges required.' });
+            }
+        }
+
+        const token = generateQuickLoginToken(target_user_id);
+        res.status(200).json({ autologinUrl: `/?autologin=${token}` });
+    } catch (err) {
+        console.error('Generate login link error:', err);
+        res.status(500).json({ error: 'Server error: ' + err.message });
+    }
+});
+
+// AUTH: CONSUME AUTOLOGIN TOKEN (1-Click session initialization in new tab)
+app.post('/api/auth/autologin', async (req, res) => {
+    const { token } = req.body;
+    if (!token || !quickLoginTokens.has(token)) {
+        return res.status(400).json({ error: 'Invalid or expired login link. Please request a new link from Admin.' });
+    }
+
+    const sessionData = quickLoginTokens.get(token);
+    if (Date.now() > sessionData.expiresAt) {
+        quickLoginTokens.delete(token);
+        return res.status(400).json({ error: 'Login link has expired.' });
+    }
+
+    try {
+        let user = null;
+        if (dbType === 'mssql') {
+            const result = await mssqlPool.request()
+                .input('id', sql.Int, sessionData.userId)
+                .query('SELECT id, name, email, phone, role, extra, is_verified FROM users WHERE id = @id');
+            user = result.recordset[0];
+        } else {
+            user = await new Promise((resolve, reject) => {
+                sqliteDb.get(
+                    `SELECT id, name, email, phone, role, extra, is_verified FROM users WHERE id = ?`,
+                    [sessionData.userId],
+                    (err, row) => { if (err) reject(err); else resolve(row); }
+                );
+            });
+        }
+
+        if (!user) {
+            return res.status(404).json({ error: 'User account not found.' });
+        }
+
+        res.status(200).json({
+            message: `Successfully logged in as ${user.name} (${user.role}).`,
+            user: user
+        });
+    } catch (err) {
+        console.error('Autologin error:', err);
         res.status(500).json({ error: 'Database error: ' + err.message });
     }
 });
