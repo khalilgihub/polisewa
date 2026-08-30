@@ -158,6 +158,7 @@ async function initDatabase() {
         await initMssqlTables(mssqlPool);
     } catch (err) {
         console.error('⚠️ Sambungan pangkalan data gagal:', err.message);
+        initSqlite();
     }
 }
 
