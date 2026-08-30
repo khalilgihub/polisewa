@@ -147,9 +147,8 @@ const upload = multer({
 let dbType = 'sqlite';
 let mssqlPool = null;
 let sqliteDb = null;
-let sql = null;
 
-// Database Abstraction using db.js (With Automatic Failover)
+// Database Abstraction using db.js (With Automatic Failover & Local Fallback)
 async function initDatabase() {
     try {
         mssqlPool = await poolPromise;
@@ -157,7 +156,7 @@ async function initDatabase() {
         console.log('✅ Pangkalan data Azure SQL bersedia (Auto-Failover Aktif).');
         await initMssqlTables(mssqlPool);
     } catch (err) {
-        console.error('⚠️ Sambungan pangkalan data gagal:', err.message);
+        console.error('⚠️ Sambungan pangkalan data Azure SQL gagal, beralih ke SQLite tempatan:', err.message);
         initSqlite();
     }
 }
@@ -768,7 +767,6 @@ app.post('/api/signin', async (req, res) => {
     }
 });
 
-// GET ALL PROPERTIES
 // GET ALL PROPERTIES
 app.get('/api/properties', async (req, res) => {
     try {
