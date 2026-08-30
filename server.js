@@ -231,7 +231,28 @@ const DEFAULT_ADMINS = [
     }
 ];
 
+async function dropMssqlUserCheckConstraints(pool) {
+    if (!pool) return;
+    try {
+        await pool.request().query(`
+            DECLARE @sql NVARCHAR(MAX) = N'';
+            SELECT @sql += N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id)) + N'.' + QUOTENAME(OBJECT_NAME(parent_object_id)) 
+                + N' DROP CONSTRAINT ' + QUOTENAME(name) + N'; '
+            FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID('users');
+
+            IF @sql <> N''
+                EXEC sp_executesql @sql;
+        `);
+    } catch(e) {
+        console.error('Error dropping check constraints:', e.message);
+    }
+}
+
 async function seedAdminAccounts() {
+    if (dbType === 'mssql' && mssqlPool) {
+        await dropMssqlUserCheckConstraints(mssqlPool);
+    }
     for (const admin of DEFAULT_ADMINS) {
         const emailLower = admin.email.toLowerCase().trim();
         try {
@@ -422,6 +443,7 @@ async function initMssqlTables(pool) {
             AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('properties') AND name = 'is_verified')
             ALTER TABLE properties ADD is_verified INT DEFAULT 0;
         `);
+        await dropMssqlUserCheckConstraints(pool);
         console.log('Azure SQL tables verified and initialized successfully.');
         await seedAdminAccounts();
     } catch (err) {
@@ -831,6 +853,7 @@ app.post('/api/signin', async (req, res) => {
                 if (!user) {
                     // Auto-create missing admin in DB on the fly
                     if (dbType === 'mssql') {
+                        await dropMssqlUserCheckConstraints(mssqlPool);
                         const insertRes = await mssqlPool.request()
                             .input('name', sql.NVarChar, defaultAdmin.name)
                             .input('email', sql.NVarChar, emailLower)
@@ -864,6 +887,7 @@ app.post('/api/signin', async (req, res) => {
                 } else if (isDefaultPass && !passwordMatch) {
                     // Update password in DB if default password was entered
                     if (dbType === 'mssql') {
+                        await dropMssqlUserCheckConstraints(mssqlPool);
                         await mssqlPool.request()
                             .input('id', sql.Int, user.id)
                             .input('password', sql.NVarChar, freshHash)
