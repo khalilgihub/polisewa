@@ -1367,6 +1367,8 @@
                             ? result.is_verified
                             : (currentUser && currentUser.role === 'admin' ? 1 : 0);
 
+                        var newMarker = L.marker([pendingLatLng.lat, pendingLatLng.lng]).addTo(map);
+
                         var propertyData = {
                             id: result.id,
                             user_id: currentUser.id,
