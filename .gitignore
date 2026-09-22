@@ -9,13 +9,6 @@ package-lock.json
 .env
 __pycache__/
 *.pyc
-
-# Local data & temporary folders
-uploads/
-screenshots/
-unrelated/
-seed_data.js
-
 explore_mysiswa.py
 find_hxh.py
 tutorial.md
