@@ -161,19 +161,21 @@ function setRole(role) {
     var phoneLabel = document.getElementById('signup-phone-label');
     if (phoneLabel) {
         phoneLabel.innerText = (role === 'landlord')
-            ? 'WhatsApp Phone Number (For Inquiries)'
-            : 'Phone Number (Contact)';
+            ? 'WhatsApp Phone Number'
+            : 'Phone Number';
     }
 
+    var extraGroup = document.getElementById('extra-field-group');
     var extraLabel = document.getElementById('extra-field-label');
     var extraInput = document.getElementById('signup-extra');
-    if (extraLabel && extraInput) {
+    if (extraGroup) {
         if (role === 'landlord') {
-            extraLabel.innerText = 'Landlord Info / Organization (Optional)';
-            extraInput.placeholder = 'e.g. Property Owner / Agent';
+            extraGroup.style.display = 'none';
+            if (extraInput) extraInput.value = '';
         } else {
-            extraLabel.innerText = 'University / Institution';
-            extraInput.placeholder = 'Politeknik Kuching Sarawak';
+            extraGroup.style.display = 'block';
+            if (extraLabel) extraLabel.innerText = 'University / Institution';
+            if (extraInput) extraInput.placeholder = 'Politeknik Kuching Sarawak';
         }
     }
 
