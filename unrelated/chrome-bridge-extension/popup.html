@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Antigravity Pro Bridge</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      width: 320px;
+      padding: 14px;
+      background: #090d16;
+      color: #f8fafc;
+      font-size: 12px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #1e293b;
+      color: #94a3b8;
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ef4444;
+    }
+    .status-badge.connected {
+      color: #4ade80;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .status-badge.connected .dot {
+      background: #22c55e;
+      box-shadow: 0 0 6px #22c55e;
+    }
+    .ping-text {
+      font-size: 10px;
+      color: #64748b;
+      margin-left: 2px;
+    }
+
+    .card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .card-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .tab-info {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      overflow: hidden;
+    }
+    .tab-title {
+      font-weight: 600;
+      color: #e2e8f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tab-url {
+      font-size: 10px;
+      color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .btn {
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+    .btn-primary {
+      background: #0284c7;
+      color: white;
+    }
+    .btn-primary:hover { background: #0369a1; }
+    .btn-secondary {
+      background: #1e293b;
+      color: #cbd5e1;
+      border-color: #334155;
+    }
+    .btn-secondary:hover { background: #334155; color: white; }
+    .btn-studio {
+      background: #6366f1;
+      color: white;
+      grid-column: span 2;
+    }
+    .btn-studio:hover { background: #4f46e5; }
+
+    /* Settings section */
+    .settings-toggle {
+      font-size: 11px;
+      color: #38bdf8;
+      cursor: pointer;
+      text-align: center;
+      padding: 4px;
+      user-select: none;
+    }
+    .settings-form {
+      display: none;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed #1e293b;
+    }
+    .form-group {
+      margin-bottom: 6px;
+    }
+    label {
+      display: block;
+      font-size: 10px;
+      color: #94a3b8;
+      margin-bottom: 2px;
+    }
+    input {
+      width: 100%;
+      padding: 6px 8px;
+      background: #090d16;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      color: #f8fafc;
+      font-size: 11px;
+    }
+    input:focus {
+      outline: none;
+      border-color: #38bdf8;
+    }
+    .btn-save {
+      width: 100%;
+      background: #10b981;
+      color: white;
+      margin-top: 6px;
+    }
+    .btn-save:hover { background: #059669; }
+    #statusMsg {
+      font-size: 10px;
+      text-align: center;
+      margin-top: 4px;
+      color: #4ade80;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">⚡ Antigravity Pro 3.0</div>
+    <div id="statusBadge" class="status-badge">
+      <div class="dot"></div>
+      <span id="statusText">Connecting...</span>
+      <span id="pingText" class="ping-text"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>Active Chrome Tab</span>
+      <span id="tabIdBadge" style="font-size:9px;color:#38bdf8;"></span>
+    </div>
+    <div class="tab-info">
+      <span id="activeTitle" class="tab-title">Inspecting tab...</span>
+      <span id="activeUrl" class="tab-url">-</span>
+    </div>
+  </div>
+
+  <div class="btn-grid">
+    <button class="btn btn-primary" id="btnSnapViewport">📸 Viewport</button>
+    <button class="btn btn-secondary" id="btnSnapFull">📜 Full Page</button>
+    <button class="btn btn-secondary" id="btnToggleStream">🔴 Toggle Stream</button>
+    <button class="btn btn-secondary" id="btnDOM">🧠 AI DOM</button>
+    <button class="btn btn-studio" id="btnOpenStudio">🚀 Open Web Studio (:9998)</button>
+  </div>
+
+  <div class="card">
+    <div id="toggleSettings" class="settings-toggle">⚙️ Bridge Server Settings ▾</div>
+    <div id="settingsForm" class="settings-form">
+      <div class="form-group">
+        <label>Server Host</label>
+        <input type="text" id="cfgHost" placeholder="localhost" />
+      </div>
+      <div class="form-group">
+        <label>WebSocket Port</label>
+        <input type="number" id="cfgPort" placeholder="9999" />
+      </div>
+      <div class="form-group">
+        <label>Auth Token (Optional)</label>
+        <input type="text" id="cfgToken" placeholder="Leave empty for local" />
+      </div>
+      <button class="btn btn-save" id="btnSaveConfig">Save & Reconnect</button>
+      <div id="statusMsg">Settings Saved!</div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Antigravity Chrome Bridge Pro",
+  "version": "3.0.0",
+  "description": "High-speed bidirectional automation, DOM extraction, telemetry, and visual capture bridge for Antigravity IDE",
+  "permissions": [
+    "tabs",
+    "storage",
+    "scripting",
+    "webNavigation",
+    "alarms",
+    "offscreen",
+    "cookies"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Antigravity Pro Bridge"
+  }
+}
+
