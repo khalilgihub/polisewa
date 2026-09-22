@@ -42,7 +42,24 @@ function setQuickPrice(val) {
     var input = document.getElementById('filter-max-price');
     if (input) {
         input.value = val ? val : '';
+        updateQuickChipActive(val);
         onFilterCriteriaChanged();
+    }
+}
+
+function updateQuickChipActive(currentVal) {
+    var chips = document.querySelectorAll('.quick-chip, .quick-price-chip');
+    var parsedCurrent = (currentVal !== null && currentVal !== '' && !isNaN(currentVal)) ? parseFloat(currentVal) : null;
+    for (var i = 0; i < chips.length; i++) {
+        var chip = chips[i];
+        var onclickAttr = chip.getAttribute('onclick') || '';
+        var match = onclickAttr.match(/setQuickPrice\((\d+|'')?\)/);
+        var chipVal = (match && match[1] && match[1] !== "''") ? parseFloat(match[1]) : null;
+        if ((parsedCurrent === null && chipVal === null) || (parsedCurrent !== null && chipVal === parsedCurrent)) {
+            chip.classList.add('active');
+        } else {
+            chip.classList.remove('active');
+        }
     }
 }
 
@@ -78,6 +95,7 @@ function syncFilterFormWithActive() {
     var priceInput = document.getElementById('filter-max-price');
     if (priceInput) {
         priceInput.value = (activeFilters.maxPrice !== null && activeFilters.maxPrice > 0) ? activeFilters.maxPrice : '';
+        updateQuickChipActive(activeFilters.maxPrice);
     }
 
     var setChecked = function (name, list) {
@@ -137,7 +155,24 @@ function propertyMatchesFilters(prop, filters) {
     }
 
     var d = (typeof parsePropertyDetails === 'function') ? parsePropertyDetails(prop.details) : null;
-    var descLower = ((prop.name || '') + ' ' + (prop.desc || '')).toLowerCase();
+    var detailsStr = '';
+    if (prop.details) {
+        if (typeof prop.details === 'string') {
+            detailsStr = prop.details;
+        } else {
+            try { detailsStr = JSON.stringify(prop.details); } catch (e) { }
+        }
+    }
+    // Search corpus combining property name, description, and raw details text
+    var fullCorpus = ((prop.name || '') + ' ' + (prop.desc || '') + ' ' + detailsStr).toLowerCase();
+
+    // Helper to test if any keyword in an array appears in fullCorpus
+    var matchesAny = function (keywords) {
+        for (var k = 0; k < keywords.length; k++) {
+            if (fullCorpus.includes(keywords[k].toLowerCase())) return true;
+        }
+        return false;
+    };
 
     // Room Type Check
     if (filters.roomTypes && filters.roomTypes.length > 0) {
@@ -147,7 +182,16 @@ function propertyMatchesFilters(prop, filters) {
         }
         if (!matchedRoom) {
             for (var r = 0; r < filters.roomTypes.length; r++) {
-                if (descLower.includes(filters.roomTypes[r].toLowerCase())) {
+                var rt = filters.roomTypes[r];
+                var rtSynonyms = [rt.toLowerCase()];
+                if (rt === 'Single') rtSynonyms.push('bujang', 'non-sharing', 'single room', '1 orang', 'seorang');
+                else if (rt === 'Master') rtSynonyms.push('master room', 'bilik master', 'utama', 'bilik besar');
+                else if (rt === 'Middle') rtSynonyms.push('middle room', 'bilik middle', 'tengah', 'medium');
+                else if (rt === 'Studio') rtSynonyms.push('studio unit', 'bilik studio');
+                else if (rt === 'Guest') rtSynonyms.push('guest room', 'tetamu');
+                else if (rt === 'Suite') rtSynonyms.push('suite');
+
+                if (matchesAny(rtSynonyms)) {
                     matchedRoom = true;
                     break;
                 }
@@ -162,8 +206,14 @@ function propertyMatchesFilters(prop, filters) {
         if (d && d.bathroom_type && d.bathroom_type.toLowerCase() === filters.bathroomType.toLowerCase()) {
             matchedBath = true;
         }
-        if (!matchedBath && descLower.includes(filters.bathroomType.toLowerCase())) {
-            matchedBath = true;
+        if (!matchedBath) {
+            if (filters.bathroomType.toLowerCase() === 'private') {
+                matchedBath = matchesAny(['private', 'peribadi', 'bilik air peribadi', 'bilik air sendiri', 'attached bathroom', 'tandas sendiri', 'bilik air dalam bilik']);
+            } else if (filters.bathroomType.toLowerCase() === 'shared') {
+                matchedBath = matchesAny(['shared', 'share bathroom', 'shared bathroom', 'bilik air berkongsi', 'bilik air kongsi', 'kongsi bilik air', 'tandas kongsi', 'tandas berkongsi', 'luar bilik']);
+            } else {
+                matchedBath = fullCorpus.includes(filters.bathroomType.toLowerCase());
+            }
         }
         if (!matchedBath) return false;
     }
@@ -175,10 +225,21 @@ function propertyMatchesFilters(prop, filters) {
             var reqUtil = filters.utilities[u];
             var hasUtil = propUtils.indexOf(reqUtil) !== -1;
             if (!hasUtil) {
-                var kw = reqUtil.replace(' / Internet Access', '').replace('Air-Conditioning', 'air-con').toLowerCase();
-                if (descLower.includes(kw) || descLower.includes(reqUtil.toLowerCase())) {
-                    hasUtil = true;
+                var uSynonyms = [reqUtil.toLowerCase()];
+                if (reqUtil.includes('Wifi')) {
+                    uSynonyms.push('wifi', 'wi-fi', 'internet', 'unifi');
+                } else if (reqUtil === 'Air-Conditioning') {
+                    uSynonyms.push('aircond', 'air-con', 'air con', 'air conditioner', 'hawa dingin', 'berhawa dingin');
+                } else if (reqUtil === 'Washing Machine') {
+                    uSynonyms.push('mesin basuh', 'washing machine', 'dobi');
+                } else if (reqUtil === 'Cooking Allowed') {
+                    uSynonyms.push('cooking', 'dapur', 'masak', 'dapur masak');
+                } else if (reqUtil === 'TV') {
+                    uSynonyms.push('tv', 'televisyen');
+                } else if (reqUtil === 'Shower') {
+                    uSynonyms.push('shower', 'water heater', 'pemanas air', 'mandi');
                 }
+                hasUtil = matchesAny(uSynonyms);
             }
             if (!hasUtil) return false;
         }
@@ -189,7 +250,19 @@ function propertyMatchesFilters(prop, filters) {
         var propFloors = (d && Array.isArray(d.floor_level)) ? d.floor_level : (d && d.floor_level ? [d.floor_level] : []);
         var matchedFloor = false;
         for (var f = 0; f < filters.floorLevels.length; f++) {
-            if (propFloors.indexOf(filters.floorLevels[f]) !== -1 || descLower.includes(filters.floorLevels[f].toLowerCase() + ' floor')) {
+            var fl = filters.floorLevels[f];
+            if (propFloors.indexOf(fl) !== -1) {
+                matchedFloor = true;
+                break;
+            }
+            var flSynonyms = [fl.toLowerCase() + ' floor'];
+            if (fl === 'Ground') flSynonyms.push('ground', 'tingkat bawah', 'tingkat dasar');
+            else if (fl === 'Low') flSynonyms.push('low floor', 'tingkat rendah', 'tingkat 1', 'tingkat 2');
+            else if (fl === 'Mid') flSynonyms.push('mid floor', 'tingkat pertengahan', 'tingkat 3', 'tingkat 4');
+            else if (fl === 'High') flSynonyms.push('high floor', 'tingkat tinggi', 'tingkat atas');
+            else if (fl === 'Penthouse') flSynonyms.push('penthouse');
+
+            if (matchesAny(flSynonyms)) {
                 matchedFloor = true;
                 break;
             }
@@ -204,8 +277,19 @@ function propertyMatchesFilters(prop, filters) {
             var reqPref = filters.generalPrefs[g];
             var hasPref = propGen.indexOf(reqPref) !== -1;
             if (!hasPref) {
-                var pWord = reqPref.replace('Prefer ', '').toLowerCase();
-                if (descLower.includes(pWord)) hasPref = true;
+                var gSynonyms = [reqPref.replace('Prefer ', '').toLowerCase()];
+                if (reqPref.includes('muslim')) {
+                    gSynonyms.push('muslim', 'islam', 'lelaki muslim', 'perempuan muslim');
+                } else if (reqPref.includes('Zero Deposit')) {
+                    gSynonyms.push('zero deposit', 'tanpa deposit', 'tiada deposit', '0 deposit');
+                } else if (reqPref.includes('move-in immediately')) {
+                    gSynonyms.push('kemasukan segera', 'segera', 'move-in immediately', 'ready to move', 'urgent');
+                } else if (reqPref.includes('pet allowed')) {
+                    gSynonyms.push('pet allowed', 'haiwan', 'peliharaan', 'pets');
+                } else if (reqPref.includes('smoking allowed')) {
+                    gSynonyms.push('smoking allowed', 'merokok');
+                }
+                hasPref = matchesAny(gSynonyms);
             }
             if (!hasPref) return false;
         }
@@ -217,7 +301,13 @@ function propertyMatchesFilters(prop, filters) {
         for (var o = 0; o < filters.occupationPrefs.length; o++) {
             var reqOcc = filters.occupationPrefs[o];
             var hasOcc = propOcc.indexOf(reqOcc) !== -1;
-            if (!hasOcc && descLower.includes(reqOcc.toLowerCase())) hasOcc = true;
+            if (!hasOcc) {
+                var oSynonyms = [reqOcc.toLowerCase()];
+                if (reqOcc.toLowerCase() === 'student') {
+                    oSynonyms.push('pelajar', 'student', 'pks', 'politeknik', 'mahasiswa');
+                }
+                hasOcc = matchesAny(oSynonyms);
+            }
             if (!hasOcc) return false;
         }
     }
@@ -228,6 +318,7 @@ function propertyMatchesFilters(prop, filters) {
 // 3. Dynamic Filter Form Handlers & Map Sync
 function onFilterCriteriaChanged() {
     var tempFilters = getFormFilterValues();
+    updateQuickChipActive(tempFilters.maxPrice);
     var priceDisplay = document.getElementById('filter-price-display');
     if (priceDisplay) {
         if (tempFilters.maxPrice !== null && tempFilters.maxPrice > 0) {

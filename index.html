@@ -25,7 +25,7 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <!-- Custom Stylesheet -->
-    <link rel="stylesheet" href="style.css?v=20260922_v5" />
+    <link rel="stylesheet" href="style.css?v=20260922_v6" />
 </head>
 
 <body>
@@ -363,92 +363,94 @@
                 </div>
 
                 <form id="property-filter-form" onsubmit="handleApplyFilters(event)">
-                    <!-- 1. Monthly Rent Budget -->
-                    <div class="filter-group">
-                        <div class="filter-group-header">
-                            <label class="filter-label">Monthly Rent</label>
-                            <span id="filter-price-display" class="filter-val-pill">Any Price</span>
+                    <div class="filter-modal-body">
+                        <!-- 1. Monthly Rent Budget -->
+                        <div class="filter-group">
+                            <div class="filter-group-header">
+                                <label class="filter-label">Monthly Rent</label>
+                                <span id="filter-price-display" class="filter-val-pill">Any Price</span>
+                            </div>
+                            <div class="filter-price-input-row">
+                                <div class="price-input-prefix">RM</div>
+                                <input type="number" id="filter-max-price" placeholder="Max budget (e.g. 450)" min="0" step="10" oninput="onFilterCriteriaChanged()" />
+                            </div>
+                            <div class="filter-quick-chips">
+                                <button type="button" class="quick-chip" onclick="setQuickPrice(300)">≤ RM 300</button>
+                                <button type="button" class="quick-chip" onclick="setQuickPrice(400)">≤ RM 400</button>
+                                <button type="button" class="quick-chip" onclick="setQuickPrice(500)">≤ RM 500</button>
+                                <button type="button" class="quick-chip" onclick="setQuickPrice(700)">≤ RM 700</button>
+                                <button type="button" class="quick-chip" onclick="setQuickPrice('')">Any Price</button>
+                            </div>
                         </div>
-                        <div class="filter-price-input-row">
-                            <div class="price-input-prefix">RM</div>
-                            <input type="number" id="filter-max-price" placeholder="Max budget (e.g. 450)" min="0" step="10" oninput="onFilterCriteriaChanged()" />
-                        </div>
-                        <div class="filter-quick-chips">
-                            <button type="button" class="quick-chip" onclick="setQuickPrice(300)">≤ RM 300</button>
-                            <button type="button" class="quick-chip" onclick="setQuickPrice(400)">≤ RM 400</button>
-                            <button type="button" class="quick-chip" onclick="setQuickPrice(500)">≤ RM 500</button>
-                            <button type="button" class="quick-chip" onclick="setQuickPrice(700)">≤ RM 700</button>
-                            <button type="button" class="quick-chip" onclick="setQuickPrice('')">Any Price</button>
-                        </div>
-                    </div>
 
-                    <!-- 2. Room Type -->
-                    <div class="filter-group">
-                        <label class="filter-label">Room Type</label>
-                        <div class="filter-chips-grid">
-                            <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Single" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">🛏️ Single</span></label>
-                            <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Master" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">👑 Master</span></label>
-                            <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Middle" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">🚪 Middle</span></label>
-                            <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Studio" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">🏢 Studio</span></label>
-                            <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Guest" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">🛋️ Guest</span></label>
-                            <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Suite" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">✨ Suite</span></label>
+                        <!-- 2. Room Type -->
+                        <div class="filter-group">
+                            <label class="filter-label">Room Type</label>
+                            <div class="filter-chips-grid">
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Single" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">🛏️ Single</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Master" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">👑 Master</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Middle" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">🚪 Middle</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Studio" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">🏢 Studio</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Guest" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">🛋️ Guest</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Suite" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">✨ Suite</span></label>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- 3. Bathroom Type -->
-                    <div class="filter-group">
-                        <label class="filter-label">Bathroom Type</label>
-                        <div class="filter-segmented-group">
-                            <label class="filter-segment-item">
-                                <input type="radio" name="filter_bathroom_type" value="" checked onchange="onFilterCriteriaChanged()">
-                                <span class="filter-segment-box">Any</span>
-                            </label>
-                            <label class="filter-segment-item">
-                                <input type="radio" name="filter_bathroom_type" value="Private" onchange="onFilterCriteriaChanged()">
-                                <span class="filter-segment-box">🚿 Private</span>
-                            </label>
-                            <label class="filter-segment-item">
-                                <input type="radio" name="filter_bathroom_type" value="Shared" onchange="onFilterCriteriaChanged()">
-                                <span class="filter-segment-box">🚻 Shared</span>
-                            </label>
+                        <!-- 3. Bathroom Type -->
+                        <div class="filter-group">
+                            <label class="filter-label">Bathroom Type</label>
+                            <div class="filter-segmented-group">
+                                <label class="filter-segment-item">
+                                    <input type="radio" name="filter_bathroom_type" value="" checked onchange="onFilterCriteriaChanged()">
+                                    <span class="filter-segment-box">Any</span>
+                                </label>
+                                <label class="filter-segment-item">
+                                    <input type="radio" name="filter_bathroom_type" value="Private" onchange="onFilterCriteriaChanged()">
+                                    <span class="filter-segment-box">🚿 Private</span>
+                                </label>
+                                <label class="filter-segment-item">
+                                    <input type="radio" name="filter_bathroom_type" value="Shared" onchange="onFilterCriteriaChanged()">
+                                    <span class="filter-segment-box">🚻 Shared</span>
+                                </label>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- 4. Utilities & Amenities -->
-                    <div class="filter-group">
-                        <label class="filter-label">Utilities & Amenities</label>
-                        <div class="filter-checkbox-grid">
-                            <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Wifi / Internet Access" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">📶 Wifi / Internet</span></label>
-                            <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Air-Conditioning" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">❄️ Air-Conditioning</span></label>
-                            <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Washing Machine" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🧺 Washing Machine</span></label>
-                            <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Cooking Allowed" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🍳 Cooking Allowed</span></label>
-                            <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="TV" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">📺 TV</span></label>
-                            <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Shower" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🚿 Shower</span></label>
+                        <!-- 4. Utilities & Amenities -->
+                        <div class="filter-group">
+                            <label class="filter-label">Utilities & Amenities</label>
+                            <div class="filter-checkbox-grid">
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Wifi / Internet Access" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">📶 Wifi / Internet</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Air-Conditioning" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">❄️ Air-Conditioning</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Washing Machine" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🧺 Washing Machine</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Cooking Allowed" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🍳 Cooking Allowed</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="TV" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">📺 TV</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Shower" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🚿 Shower</span></label>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- 5. Floor Level -->
-                    <div class="filter-group">
-                        <label class="filter-label">Floor Level</label>
-                        <div class="filter-chips-grid">
-                            <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="Ground" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">Ground</span></label>
-                            <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="Low" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">Low</span></label>
-                            <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="Mid" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">Mid</span></label>
-                            <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="High" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">High</span></label>
-                            <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="Penthouse" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">Penthouse</span></label>
+                        <!-- 5. Floor Level -->
+                        <div class="filter-group">
+                            <label class="filter-label">Floor Level</label>
+                            <div class="filter-chips-grid">
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="Ground" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">Ground</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="Low" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">Low</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="Mid" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">Mid</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="High" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">High</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="Penthouse" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">Penthouse</span></label>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- 6. Preferences & Tenant Criteria -->
-                    <div class="filter-group">
-                        <label class="filter-label">Preferences</label>
-                        <div class="filter-checkbox-grid">
-                            <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer muslim friendly" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🕌 Muslim Friendly</span></label>
-                            <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer Zero Deposit" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">💰 Zero Deposit</span></label>
-                            <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer move-in immediately" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🚀 Move-in Immediately</span></label>
-                            <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer pet allowed" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🐾 Pet Allowed</span></label>
-                            <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_occupation" value="Student" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🎓 Student Tenant</span></label>
-                            <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer smoking allowed" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🚬 Smoking Allowed</span></label>
+                        <!-- 6. Preferences & Tenant Criteria -->
+                        <div class="filter-group">
+                            <label class="filter-label">Preferences</label>
+                            <div class="filter-checkbox-grid">
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer muslim friendly" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🕌 Muslim Friendly</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer Zero Deposit" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">💰 Zero Deposit</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer move-in immediately" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🚀 Move-in Immediately</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer pet allowed" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🐾 Pet Allowed</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_occupation" value="Student" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🎓 Student Tenant</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer smoking allowed" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🚬 Smoking Allowed</span></label>
+                            </div>
                         </div>
                     </div>
 
