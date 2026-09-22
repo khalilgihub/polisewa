@@ -28,7 +28,7 @@
     <script src="boundary.js"></script>
 
     <!-- Custom Stylesheet -->
-    <link rel="stylesheet" href="style.css?v=20260917_4" />
+    <link rel="stylesheet" href="style.css?v=20260922_filter" />
 </head>
 
 <body>
@@ -85,6 +85,13 @@
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
                     </button>
+                    <button id="search-filter-btn" type="button" class="search-filter-btn" title="Filter properties" onclick="openFilterModal()" aria-label="Filter properties">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                        <span class="search-filter-text">Filter</span>
+                        <span id="filter-active-count" class="filter-active-badge" style="display:none;">0</span>
+                    </button>
                     <button id="search-button" aria-label="Search">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                             stroke-linecap="round" stroke-linejoin="round">
@@ -95,6 +102,14 @@
                 </div>
                 <!-- Dynamic dropdown results -->
                 <div id="search-results"></div>
+                <!-- Active filter banner -->
+                <div id="active-filter-banner" class="active-filter-banner" style="display:none;">
+                    <div class="active-filter-text" onclick="openFilterModal()">
+                        <span class="active-filter-icon">⚙️</span>
+                        <span id="active-filter-summary">Showing filtered properties</span>
+                    </div>
+                    <button type="button" class="active-filter-clear" onclick="resetAllFilters(true)" title="Clear all filters">✕ Clear</button>
+                </div>
             </div>
         </div>
 
@@ -380,6 +395,127 @@
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Property Filter Modal Overlay -->
+        <div id="filter-modal-overlay" class="modal-overlay">
+            <div id="filter-modal" class="modal-card filter-modal-card">
+                <button class="close-btn" onclick="closeFilterModal()" aria-label="Close">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+
+                <div class="modal-header filter-modal-header">
+                    <div class="filter-header-title-row">
+                        <span class="filter-title-icon">⚙️</span>
+                        <div>
+                            <h2>Filter Properties</h2>
+                            <p>Find room rentals matching your budget and specifications</p>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="property-filter-form" onsubmit="handleApplyFilters(event)">
+                    <div class="filter-modal-body">
+                        <!-- 1. Monthly Rent Budget -->
+                        <div class="filter-group">
+                            <div class="filter-group-header">
+                                <label class="filter-label">Monthly Rent</label>
+                                <span id="filter-price-display" class="filter-val-pill">Any Price</span>
+                            </div>
+                            <div class="filter-price-input-row">
+                                <div class="price-input-prefix">RM</div>
+                                <input type="number" id="filter-max-price" placeholder="Max budget (e.g. 450)" min="0" step="10" oninput="onFilterCriteriaChanged()" />
+                            </div>
+                            <div class="filter-quick-chips">
+                                <button type="button" class="quick-chip" onclick="setQuickPrice(300)">≤ RM 300</button>
+                                <button type="button" class="quick-chip" onclick="setQuickPrice(400)">≤ RM 400</button>
+                                <button type="button" class="quick-chip" onclick="setQuickPrice(500)">≤ RM 500</button>
+                                <button type="button" class="quick-chip" onclick="setQuickPrice(700)">≤ RM 700</button>
+                                <button type="button" class="quick-chip" onclick="setQuickPrice('')">Any Price</button>
+                            </div>
+                        </div>
+
+                        <!-- 2. Room Type -->
+                        <div class="filter-group">
+                            <label class="filter-label">Room Type</label>
+                            <div class="filter-chips-grid">
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Single" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">🛏️ Single</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Middle" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">🛏️ Middle</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Master" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">👑 Master</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Studio" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">🏢 Studio</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Guest" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">🛋️ Guest</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_room_type" value="Suite" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">✨ Suite</span></label>
+                            </div>
+                        </div>
+
+                        <!-- 3. Bathroom Type -->
+                        <div class="filter-group">
+                            <label class="filter-label">Bathroom Type</label>
+                            <div class="filter-segmented-group">
+                                <label class="filter-segment-item">
+                                    <input type="radio" name="filter_bathroom_type" value="" checked onchange="onFilterCriteriaChanged()">
+                                    <span class="filter-segment-box">Any</span>
+                                </label>
+                                <label class="filter-segment-item">
+                                    <input type="radio" name="filter_bathroom_type" value="Private" onchange="onFilterCriteriaChanged()">
+                                    <span class="filter-segment-box">🚿 Private</span>
+                                </label>
+                                <label class="filter-segment-item">
+                                    <input type="radio" name="filter_bathroom_type" value="Shared" onchange="onFilterCriteriaChanged()">
+                                    <span class="filter-segment-box">🚻 Shared</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 4. Utilities & Amenities -->
+                        <div class="filter-group">
+                            <label class="filter-label">Utilities & Amenities</label>
+                            <div class="filter-checkbox-grid">
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Wifi / Internet Access" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">📶 Wifi / Internet</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Air-Conditioning" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">❄️ Air-Conditioning</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Washing Machine" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🧺 Washing Machine</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Cooking Allowed" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🍳 Cooking Allowed</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="TV" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">📺 TV</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_utilities" value="Shower" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🚿 Shower</span></label>
+                            </div>
+                        </div>
+
+                        <!-- 5. Floor Level -->
+                        <div class="filter-group">
+                            <label class="filter-label">Floor Level</label>
+                            <div class="filter-chips-grid">
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="Ground" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">Ground</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="Low" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">Low</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="Mid" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">Mid</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="High" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">High</span></label>
+                                <label class="filter-chip-item"><input type="checkbox" name="filter_floor_level" value="Penthouse" onchange="onFilterCriteriaChanged()"><span class="filter-chip-box">Penthouse</span></label>
+                            </div>
+                        </div>
+
+                        <!-- 6. Preferences & Tenant Criteria -->
+                        <div class="filter-group">
+                            <label class="filter-label">Preferences</label>
+                            <div class="filter-checkbox-grid">
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer muslim friendly" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🕌 Muslim Friendly</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer Zero Deposit" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">💰 Zero Deposit</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer move-in immediately" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🚀 Move-in Immediately</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer pet allowed" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🐾 Pet Allowed</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_occupation" value="Student" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🎓 Student Tenant</span></label>
+                                <label class="custom-checkbox-item"><input type="checkbox" name="filter_pref_general" value="Prefer smoking allowed" onchange="onFilterCriteriaChanged()"><span class="checkbox-box"></span><span class="checkbox-label">🚬 Smoking Allowed</span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions Footer -->
+                    <div class="filter-modal-actions">
+                        <button type="button" class="filter-reset-btn" onclick="resetAllFilters(false)">Reset</button>
+                        <button type="submit" class="filter-apply-btn" id="filter-apply-btn">Show Results</button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -1158,6 +1294,9 @@
                             });
                         })(marker, index);
                     }
+                    if (typeof applyFiltersToMap === 'function') {
+                        applyFiltersToMap();
+                    }
                 })
                 .catch(function(err) {
                     console.error('Failed to load properties:', err);
@@ -1188,6 +1327,9 @@
                 try {
                     return JSON.parse(trimmed);
                 } catch (e) {
+                    if (trimmed.includes(',')) {
+                        return { utilities: trimmed.split(',').map(function(s) { return s.trim(); }).filter(Boolean) };
+                    }
                     return null;
                 }
             }
@@ -2177,6 +2319,446 @@
 
         var searchDebounceTimer = null;
 
+        var activeFilters = {
+            maxPrice: null,
+            roomTypes: [],
+            bathroomType: '',
+            utilities: [],
+            floorLevels: [],
+            generalPrefs: [],
+            occupationPrefs: []
+        };
+
+        // 1. Filter Modal & Quick Price Controls
+        function openFilterModal() {
+            var searchBox = document.getElementById('search-box');
+            var resultsContainer = document.getElementById('search-results');
+            if (resultsContainer) resultsContainer.style.display = 'none';
+            if (searchBox) searchBox.classList.remove('has-results');
+
+            syncFilterFormWithActive();
+            onFilterCriteriaChanged();
+
+            var filterModalOverlay = document.getElementById('filter-modal-overlay');
+            if (filterModalOverlay) {
+                filterModalOverlay.classList.add('active');
+            }
+        }
+
+        function closeFilterModal() {
+            var filterModalOverlay = document.getElementById('filter-modal-overlay');
+            if (filterModalOverlay) {
+                filterModalOverlay.classList.remove('active');
+            }
+        }
+
+        function setQuickPrice(val) {
+            var input = document.getElementById('filter-max-price');
+            if (input) {
+                input.value = val ? val : '';
+                updateQuickChipActive(val);
+                onFilterCriteriaChanged();
+            }
+        }
+
+        function updateQuickChipActive(currentVal) {
+            var chips = document.querySelectorAll('.quick-chip, .quick-price-chip');
+            var parsedCurrent = (currentVal !== null && currentVal !== '' && !isNaN(currentVal)) ? parseFloat(currentVal) : null;
+            for (var i = 0; i < chips.length; i++) {
+                var chip = chips[i];
+                var onclickAttr = chip.getAttribute('onclick') || '';
+                var match = onclickAttr.match(/setQuickPrice\((\d+|'')?\)/);
+                var chipVal = (match && match[1] && match[1] !== "''") ? parseFloat(match[1]) : null;
+                if ((parsedCurrent === null && chipVal === null) || (parsedCurrent !== null && chipVal === parsedCurrent)) {
+                    chip.classList.add('active');
+                } else {
+                    chip.classList.remove('active');
+                }
+            }
+        }
+
+        function getFormFilterValues() {
+            var priceInput = document.getElementById('filter-max-price');
+            var rawPrice = priceInput ? priceInput.value.trim() : '';
+            var maxPrice = (rawPrice !== '' && !isNaN(rawPrice)) ? parseFloat(rawPrice) : null;
+
+            var getChecked = function(name) {
+                var checked = [];
+                var inputs = document.querySelectorAll('input[name="' + name + '"]:checked');
+                for (var i = 0; i < inputs.length; i++) {
+                    checked.push(inputs[i].value);
+                }
+                return checked;
+            };
+
+            var bathRadio = document.querySelector('input[name="filter_bathroom_type"]:checked');
+            var bathroomType = bathRadio ? bathRadio.value : '';
+
+            return {
+                maxPrice: maxPrice,
+                roomTypes: getChecked('filter_room_type'),
+                bathroomType: bathroomType,
+                utilities: getChecked('filter_utilities'),
+                floorLevels: getChecked('filter_floor_level'),
+                generalPrefs: getChecked('filter_pref_general'),
+                occupationPrefs: getChecked('filter_pref_occupation')
+            };
+        }
+
+        function syncFilterFormWithActive() {
+            var priceInput = document.getElementById('filter-max-price');
+            if (priceInput) {
+                priceInput.value = (activeFilters.maxPrice !== null && activeFilters.maxPrice > 0) ? activeFilters.maxPrice : '';
+                updateQuickChipActive(activeFilters.maxPrice);
+            }
+
+            var setChecked = function(name, list) {
+                var inputs = document.querySelectorAll('input[name="' + name + '"]');
+                for (var i = 0; i < inputs.length; i++) {
+                    inputs[i].checked = (list && list.indexOf(inputs[i].value) !== -1);
+                }
+            };
+
+            setChecked('filter_room_type', activeFilters.roomTypes);
+            setChecked('filter_utilities', activeFilters.utilities);
+            setChecked('filter_floor_level', activeFilters.floorLevels);
+            setChecked('filter_pref_general', activeFilters.generalPrefs);
+            setChecked('filter_pref_occupation', activeFilters.occupationPrefs);
+
+            var bathRadios = document.querySelectorAll('input[name="filter_bathroom_type"]');
+            for (var b = 0; b < bathRadios.length; b++) {
+                bathRadios[b].checked = (bathRadios[b].value === activeFilters.bathroomType);
+            }
+        }
+
+        // 2. Filter Evaluation & Criteria Checking
+        function hasActiveFilter(filters) {
+            if (!filters) return false;
+            if (filters.maxPrice !== null && filters.maxPrice > 0) return true;
+            if (filters.roomTypes && filters.roomTypes.length > 0) return true;
+            if (filters.bathroomType && filters.bathroomType !== '') return true;
+            if (filters.utilities && filters.utilities.length > 0) return true;
+            if (filters.floorLevels && filters.floorLevels.length > 0) return true;
+            if (filters.generalPrefs && filters.generalPrefs.length > 0) return true;
+            if (filters.occupationPrefs && filters.occupationPrefs.length > 0) return true;
+            return false;
+        }
+
+        function countActiveFilterCriteria(filters) {
+            if (!filters) return 0;
+            var count = 0;
+            if (filters.maxPrice !== null && filters.maxPrice > 0) count++;
+            if (filters.roomTypes && filters.roomTypes.length > 0) count += filters.roomTypes.length;
+            if (filters.bathroomType && filters.bathroomType !== '') count++;
+            if (filters.utilities && filters.utilities.length > 0) count += filters.utilities.length;
+            if (filters.floorLevels && filters.floorLevels.length > 0) count += filters.floorLevels.length;
+            if (filters.generalPrefs && filters.generalPrefs.length > 0) count += filters.generalPrefs.length;
+            if (filters.occupationPrefs && filters.occupationPrefs.length > 0) count += filters.occupationPrefs.length;
+            return count;
+        }
+
+        function propertyMatchesFilters(prop, filters) {
+            if (!filters || !hasActiveFilter(filters)) return true;
+
+            // Price Budget Check
+            if (filters.maxPrice !== null && filters.maxPrice > 0) {
+                var pVal = parseFloat(prop.price);
+                if (isNaN(pVal) || pVal > filters.maxPrice) {
+                    return false;
+                }
+            }
+
+            var d = (typeof parsePropertyDetails === 'function') ? parsePropertyDetails(prop.details) : null;
+            var detailsStr = '';
+            if (prop.details) {
+                if (typeof prop.details === 'string') {
+                    detailsStr = prop.details;
+                } else {
+                    try { detailsStr = JSON.stringify(prop.details); } catch (e) { }
+                }
+            }
+            // Search corpus combining property name, description, and raw details text
+            var fullCorpus = ((prop.name || '') + ' ' + (prop.desc || '') + ' ' + detailsStr).toLowerCase();
+
+            // Helper to test if any keyword in an array appears in fullCorpus
+            var matchesAny = function (keywords) {
+                for (var k = 0; k < keywords.length; k++) {
+                    if (fullCorpus.includes(keywords[k].toLowerCase())) return true;
+                }
+                return false;
+            };
+
+            // Room Type Check
+            if (filters.roomTypes && filters.roomTypes.length > 0) {
+                var matchedRoom = false;
+                if (d && d.room_type && filters.roomTypes.indexOf(d.room_type) !== -1) {
+                    matchedRoom = true;
+                }
+                if (!matchedRoom) {
+                    for (var r = 0; r < filters.roomTypes.length; r++) {
+                        var rt = filters.roomTypes[r];
+                        var rtSynonyms = [rt.toLowerCase()];
+                        if (rt === 'Single') rtSynonyms.push('bujang', 'non-sharing', 'single room', '1 orang', 'seorang');
+                        else if (rt === 'Master') rtSynonyms.push('master room', 'bilik master', 'utama', 'bilik besar');
+                        else if (rt === 'Middle') rtSynonyms.push('middle room', 'bilik middle', 'tengah', 'medium');
+                        else if (rt === 'Studio') rtSynonyms.push('studio unit', 'bilik studio');
+                        else if (rt === 'Guest') rtSynonyms.push('guest room', 'tetamu');
+                        else if (rt === 'Suite') rtSynonyms.push('suite');
+
+                        if (matchesAny(rtSynonyms)) {
+                            matchedRoom = true;
+                            break;
+                        }
+                    }
+                }
+                if (!matchedRoom) return false;
+            }
+
+            // Bathroom Type Check
+            if (filters.bathroomType) {
+                var matchedBath = false;
+                if (d && d.bathroom_type && d.bathroom_type.toLowerCase() === filters.bathroomType.toLowerCase()) {
+                    matchedBath = true;
+                }
+                if (!matchedBath) {
+                    if (filters.bathroomType.toLowerCase() === 'private') {
+                        matchedBath = matchesAny(['private', 'peribadi', 'bilik air peribadi', 'bilik air sendiri', 'attached bathroom', 'tandas sendiri', 'bilik air dalam bilik']);
+                    } else if (filters.bathroomType.toLowerCase() === 'shared') {
+                        matchedBath = matchesAny(['shared', 'share bathroom', 'shared bathroom', 'bilik air berkongsi', 'bilik air kongsi', 'kongsi bilik air', 'tandas kongsi', 'tandas berkongsi', 'luar bilik']);
+                    } else {
+                        matchedBath = fullCorpus.includes(filters.bathroomType.toLowerCase());
+                    }
+                }
+                if (!matchedBath) return false;
+            }
+
+            // Utilities Check
+            if (filters.utilities && filters.utilities.length > 0) {
+                var propUtils = (d && Array.isArray(d.utilities)) ? d.utilities : [];
+                for (var u = 0; u < filters.utilities.length; u++) {
+                    var reqUtil = filters.utilities[u];
+                    var hasUtil = propUtils.indexOf(reqUtil) !== -1;
+                    if (!hasUtil) {
+                        var uSynonyms = [reqUtil.toLowerCase()];
+                        if (reqUtil.includes('Wifi')) {
+                            uSynonyms.push('wifi', 'wi-fi', 'internet', 'unifi');
+                        } else if (reqUtil === 'Air-Conditioning') {
+                            uSynonyms.push('aircond', 'air-con', 'air con', 'air conditioner', 'hawa dingin', 'berhawa dingin');
+                        } else if (reqUtil === 'Washing Machine') {
+                            uSynonyms.push('mesin basuh', 'washing machine', 'dobi');
+                        } else if (reqUtil === 'Cooking Allowed') {
+                            uSynonyms.push('cooking', 'dapur', 'masak', 'dapur masak');
+                        } else if (reqUtil === 'TV') {
+                            uSynonyms.push('tv', 'televisyen');
+                        } else if (reqUtil === 'Shower') {
+                            uSynonyms.push('shower', 'water heater', 'pemanas air', 'mandi');
+                        }
+                        hasUtil = matchesAny(uSynonyms);
+                    }
+                    if (!hasUtil) return false;
+                }
+            }
+
+            // Floor Level Check
+            if (filters.floorLevels && filters.floorLevels.length > 0) {
+                var propFloors = (d && Array.isArray(d.floor_level)) ? d.floor_level : (d && d.floor_level ? [d.floor_level] : []);
+                var matchedFloor = false;
+                for (var f = 0; f < filters.floorLevels.length; f++) {
+                    var fl = filters.floorLevels[f];
+                    if (propFloors.indexOf(fl) !== -1) {
+                        matchedFloor = true;
+                        break;
+                    }
+                    var flSynonyms = [fl.toLowerCase() + ' floor'];
+                    if (fl === 'Ground') flSynonyms.push('ground', 'tingkat bawah', 'tingkat dasar');
+                    else if (fl === 'Low') flSynonyms.push('low floor', 'tingkat rendah', 'tingkat 1', 'tingkat 2');
+                    else if (fl === 'Mid') flSynonyms.push('mid floor', 'tingkat pertengahan', 'tingkat 3', 'tingkat 4');
+                    else if (fl === 'High') flSynonyms.push('high floor', 'tingkat tinggi', 'tingkat atas');
+                    else if (fl === 'Penthouse') flSynonyms.push('penthouse');
+
+                    if (matchesAny(flSynonyms)) {
+                        matchedFloor = true;
+                        break;
+                    }
+                }
+                if (!matchedFloor) return false;
+            }
+
+            // General Preferences Check
+            if (filters.generalPrefs && filters.generalPrefs.length > 0) {
+                var propGen = (d && d.preferences && Array.isArray(d.preferences.general)) ? d.preferences.general : [];
+                for (var g = 0; g < filters.generalPrefs.length; g++) {
+                    var reqPref = filters.generalPrefs[g];
+                    var hasPref = propGen.indexOf(reqPref) !== -1;
+                    if (!hasPref) {
+                        var gSynonyms = [reqPref.replace('Prefer ', '').toLowerCase()];
+                        if (reqPref.includes('muslim')) {
+                            gSynonyms.push('muslim', 'islam', 'lelaki muslim', 'perempuan muslim');
+                        } else if (reqPref.includes('Zero Deposit')) {
+                            gSynonyms.push('zero deposit', 'tanpa deposit', 'tiada deposit', '0 deposit');
+                        } else if (reqPref.includes('move-in immediately')) {
+                            gSynonyms.push('kemasukan segera', 'segera', 'move-in immediately', 'ready to move', 'urgent');
+                        } else if (reqPref.includes('pet allowed')) {
+                            gSynonyms.push('pet allowed', 'haiwan', 'peliharaan', 'pets');
+                        } else if (reqPref.includes('smoking allowed')) {
+                            gSynonyms.push('smoking allowed', 'merokok');
+                        }
+                        hasPref = matchesAny(gSynonyms);
+                    }
+                    if (!hasPref) return false;
+                }
+            }
+
+            // Occupation Preference Check
+            if (filters.occupationPrefs && filters.occupationPrefs.length > 0) {
+                var propOcc = (d && d.preferences && Array.isArray(d.preferences.occupation)) ? d.preferences.occupation : [];
+                for (var o = 0; o < filters.occupationPrefs.length; o++) {
+                    var reqOcc = filters.occupationPrefs[o];
+                    var hasOcc = propOcc.indexOf(reqOcc) !== -1;
+                    if (!hasOcc) {
+                        var oSynonyms = [reqOcc.toLowerCase()];
+                        if (reqOcc.toLowerCase() === 'student') {
+                            oSynonyms.push('pelajar', 'student', 'pks', 'politeknik', 'mahasiswa');
+                        }
+                        hasOcc = matchesAny(oSynonyms);
+                    }
+                    if (!hasOcc) return false;
+                }
+            }
+
+            return true;
+        }
+
+        // 3. Dynamic Filter Form Handlers & Map Sync
+        function onFilterCriteriaChanged() {
+            var tempFilters = getFormFilterValues();
+            updateQuickChipActive(tempFilters.maxPrice);
+            var priceDisplay = document.getElementById('filter-price-display');
+            if (priceDisplay) {
+                if (tempFilters.maxPrice !== null && tempFilters.maxPrice > 0) {
+                    priceDisplay.innerText = '≤ RM ' + tempFilters.maxPrice;
+                } else {
+                    priceDisplay.innerText = 'Any Price';
+                }
+            }
+
+            var count = 0;
+            var total = 0;
+            for (var i = 0; i < (landlordMarkers || []).length; i++) {
+                var item = landlordMarkers[i];
+                if (!item) continue;
+                var isOwner = currentUser && currentUser.id === item.user_id;
+                var isAdmin = currentUser && currentUser.role === 'admin';
+                var isVerified = item.is_verified === 1;
+                if (!isVerified && !isAdmin && !isOwner) continue;
+
+                total++;
+                if (propertyMatchesFilters(item, tempFilters)) {
+                    count++;
+                }
+            }
+
+            var applyBtn = document.getElementById('filter-apply-btn');
+            if (applyBtn) {
+                if (hasActiveFilter(tempFilters)) {
+                    applyBtn.innerText = 'Show ' + count + ' Properties';
+                } else {
+                    applyBtn.innerText = 'Show All (' + total + ')';
+                }
+            }
+        }
+
+        function handleApplyFilters(event) {
+            if (event) event.preventDefault();
+            activeFilters = getFormFilterValues();
+            closeFilterModal();
+            applyFiltersToMap();
+        }
+
+        function resetAllFilters(skipMapRefresh) {
+            activeFilters = {
+                maxPrice: null,
+                roomTypes: [],
+                bathroomType: '',
+                utilities: [],
+                floorLevels: [],
+                generalPrefs: [],
+                occupationPrefs: []
+            };
+            syncFilterFormWithActive();
+            onFilterCriteriaChanged();
+            if (skipMapRefresh) {
+                applyFiltersToMap();
+            }
+        }
+
+        function applyFiltersToMap() {
+            var isFiltered = hasActiveFilter(activeFilters);
+            var visibleCount = 0;
+            var totalCount = 0;
+
+            for (var i = 0; i < (landlordMarkers || []).length; i++) {
+                var item = landlordMarkers[i];
+                if (!item || !item.marker) continue;
+
+                var isOwner = currentUser && currentUser.id === item.user_id;
+                var isAdmin = currentUser && currentUser.role === 'admin';
+                var isVerified = item.is_verified === 1;
+
+                if (!isVerified && !isAdmin && !isOwner) {
+                    if (map.hasLayer(item.marker)) map.removeLayer(item.marker);
+                    continue;
+                }
+
+                totalCount++;
+                var matches = propertyMatchesFilters(item, activeFilters);
+
+                if (matches) {
+                    visibleCount++;
+                    if (!map.hasLayer(item.marker)) {
+                        map.addLayer(item.marker);
+                    }
+                } else {
+                    if (map.hasLayer(item.marker)) {
+                        map.removeLayer(item.marker);
+                    }
+                    if (item.marker.isPopupOpen && item.marker.isPopupOpen()) {
+                        item.marker.closePopup();
+                    }
+                }
+            }
+
+            var count = countActiveFilterCriteria(activeFilters);
+            var filterBtn = document.getElementById('search-filter-btn');
+            var badge = document.getElementById('filter-active-count');
+            var banner = document.getElementById('active-filter-banner');
+            var bannerSummary = document.getElementById('active-filter-summary');
+
+            if (isFiltered) {
+                if (filterBtn) filterBtn.classList.add('active');
+                if (badge) {
+                    badge.style.display = 'inline-flex';
+                    badge.innerText = count;
+                }
+                if (banner) {
+                    banner.style.display = 'flex';
+                    if (bannerSummary) {
+                        bannerSummary.innerHTML = 'Showing <b>' + visibleCount + '</b> of ' + totalCount + ' properties';
+                    }
+                }
+            } else {
+                if (filterBtn) filterBtn.classList.remove('active');
+                if (badge) badge.style.display = 'none';
+                if (banner) banner.style.display = 'none';
+            }
+
+            var searchInput = document.getElementById('search-input');
+            if (searchInput && searchInput.value.trim()) {
+                performSearch();
+            }
+        }
+
+        // 4. Unified Search Function (Rental Properties & Kuching Locations)
         function clearSearch() {
             var searchInput = document.getElementById("search-input");
             var resultsContainer = document.getElementById("search-results");
@@ -2191,7 +2773,6 @@
             if (clearBtn) clearBtn.style.display = 'none';
         }
 
-        // 3. Unified Search Function (Rental Properties & Kuching Locations)
         function performSearch() {
             var searchInput = document.getElementById("search-input");
             var query = searchInput ? searchInput.value.trim() : '';
@@ -2212,19 +2793,19 @@
                 return;
             }
 
-            resultsContainer.innerHTML = '<div class="result-feedback"><span style="display:inline-block; animation:spin 1s linear infinite; margin-right:6px;">🔄</span> Searching properties & places in Kuching...</div>';
-            resultsContainer.style.display = 'block';
-            if (searchBox) searchBox.classList.add('has-results');
-
             var qLower = query.toLowerCase();
             var qWords = qLower.split(/\s+/).filter(Boolean);
 
-            // 1. Search registered rental property listings
+            // 1. Search registered rental property listings from memory (instant!)
             var matchedProperties = (landlordMarkers || []).filter(function(prop) {
                 if (!prop) return false;
                 var isOwner = currentUser && currentUser.id === prop.user_id;
                 var isAdmin = currentUser && currentUser.role === 'admin';
                 if (prop.is_verified !== 1 && !isAdmin && !isOwner) {
+                    return false;
+                }
+
+                if (typeof propertyMatchesFilters === 'function' && !propertyMatchesFilters(prop, activeFilters)) {
                     return false;
                 }
 
@@ -2254,7 +2835,12 @@
                 return false;
             });
 
-            // 2. Search OpenStreetMap Nominatim for Kuching geographical places
+            // Instant render of matched properties
+            renderSearchResults(query, matchedProperties, []);
+            resultsContainer.style.display = 'block';
+            if (searchBox) searchBox.classList.add('has-results');
+
+            // 2. Search OpenStreetMap Nominatim for Kuching geographical places in background
             var queryFormatted = query;
             if (!queryFormatted.toLowerCase().includes('kuching')) {
                 queryFormatted += ', Kuching, Sarawak';
@@ -2268,6 +2854,10 @@
                     return response.json();
                 })
                 .then(function (data) {
+                    // Only update if current search input still matches query
+                    var currentInput = document.getElementById("search-input");
+                    if (currentInput && currentInput.value.trim().toLowerCase() !== qLower) return;
+
                     var localPlaces = (data || []).filter(function (item) {
                         var lat = parseFloat(item.lat);
                         var lon = parseFloat(item.lon);
@@ -2277,9 +2867,7 @@
                     renderSearchResults(query, matchedProperties, localPlaces);
                 })
                 .catch(function (error) {
-                    console.error('Search geocoding error:', error);
-                    // Still render property matches even if geocoding failed or offline
-                    renderSearchResults(query, matchedProperties, []);
+                    // Nominatim error (e.g. 403 or offline) - properties already rendered
                 });
         }
 
@@ -2450,7 +3038,7 @@
             }, 250);
         });
 
-        // Close dropdown when clicking outside
+        // Close dropdown or modal when clicking outside
         document.addEventListener('click', function (e) {
             var searchBox = document.getElementById("search-box");
             var resultsContainer = document.getElementById("search-results");
@@ -2460,6 +3048,20 @@
             }
             if (authDropdown && !authDropdown.contains(e.target) && e.target !== authBtn && !authBtn.contains(e.target)) {
                 authDropdown.classList.remove('active');
+            }
+            var filterModalOverlay = document.getElementById("filter-modal-overlay");
+            if (filterModalOverlay && e.target === filterModalOverlay) {
+                closeFilterModal();
+            }
+        });
+
+        // Global Escape key listener
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                var filterModalOverlay = document.getElementById("filter-modal-overlay");
+                if (filterModalOverlay && filterModalOverlay.classList.contains('active')) {
+                    closeFilterModal();
+                }
             }
         });
 
