@@ -403,6 +403,7 @@
                                         <input type="number" id="filter-max-price" min="0" max="1000" step="10" value="1000" placeholder="1000.00" oninput="onPriceNumberInput()" />
                                     </div>
                                 </div>
+                            </div>
                         </div>
 
                         <!-- 2. Room Type -->
@@ -860,7 +861,20 @@
 
         window.addEventListener('DOMContentLoaded', function() {
             if (typeof lucide !== 'undefined') lucide.createIcons();
+            if (map) map.invalidateSize();
         });
+
+        window.addEventListener('load', function() {
+            if (map) map.invalidateSize();
+        });
+
+        window.addEventListener('resize', function() {
+            if (map) map.invalidateSize();
+        });
+
+        setTimeout(function() {
+            if (map) map.invalidateSize();
+        }, 300);
 
         // Ensure dark-mode class and saved preference are cleared
         try {
