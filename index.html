@@ -1667,70 +1667,55 @@
             }
         }
 
+        const DETAIL_NAMES = ['prop_floor_level', 'prop_room_type', 'prop_bathroom_type', 'prop_utilities', 'prop_pref_general', 'prop_pref_race', 'prop_pref_occupation'];
+
         function collectPropertyDetailsFromPanel() {
-            var getCheckedValues = function(name) {
-                var checked = [];
-                var inputs = document.querySelectorAll('input[name="' + name + '"]:checked');
-                for (var i = 0; i < inputs.length; i++) {
-                    checked.push(inputs[i].value);
-                }
-                return checked;
+            const getChecked = name => Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(el => el.value);
+            const getRadio = name => {
+                const el = document.querySelector(`input[name="${name}"]:checked`);
+                return el ? el.value : '';
             };
-
-            var getRadioValue = function(name) {
-                var checked = document.querySelector('input[name="' + name + '"]:checked');
-                return checked ? checked.value : '';
-            };
-
             return {
-                floor_level: getCheckedValues('prop_floor_level'),
-                room_type: getRadioValue('prop_room_type'),
-                bathroom_type: getRadioValue('prop_bathroom_type'),
-                utilities: getCheckedValues('prop_utilities'),
+                floor_level: getChecked('prop_floor_level'),
+                room_type: getRadio('prop_room_type'),
+                bathroom_type: getRadio('prop_bathroom_type'),
+                utilities: getChecked('prop_utilities'),
                 preferences: {
-                    general: getCheckedValues('prop_pref_general'),
-                    race: getCheckedValues('prop_pref_race'),
-                    occupation: getCheckedValues('prop_pref_occupation')
+                    general: getChecked('prop_pref_general'),
+                    race: getChecked('prop_pref_race'),
+                    occupation: getChecked('prop_pref_occupation')
                 }
             };
         }
 
         function resetPropertyDetailsForm() {
-            var names = ['prop_floor_level', 'prop_room_type', 'prop_bathroom_type', 'prop_utilities', 'prop_pref_general', 'prop_pref_race', 'prop_pref_occupation'];
-            for (var i = 0; i < names.length; i++) {
-                var inputs = document.querySelectorAll('input[name="' + names[i] + '"]');
-                for (var j = 0; j < inputs.length; j++) {
-                    inputs[j].checked = false;
-                }
-            }
+            DETAIL_NAMES.forEach(name => {
+                document.querySelectorAll(`input[name="${name}"]`).forEach(el => el.checked = false);
+            });
         }
 
         function populatePropertyDetailsForm(details) {
             resetPropertyDetailsForm();
-            var data = parsePropertyDetails(details);
+            const data = parsePropertyDetails(details);
             if (!data || typeof data !== 'object') return;
 
-            var setChecked = function(name, values) {
-                if (!values || !Array.isArray(values)) return;
-                var inputs = document.querySelectorAll('input[name="' + name + '"]');
-                for (var i = 0; i < inputs.length; i++) {
-                    inputs[i].checked = (values.indexOf(inputs[i].value) !== -1);
-                }
+            const setChecked = (name, vals) => {
+                if (!Array.isArray(vals)) return;
+                document.querySelectorAll(`input[name="${name}"]`).forEach(el => {
+                    el.checked = vals.includes(el.value);
+                });
             };
-
-            var setRadio = function(name, val) {
+            const setRadio = (name, val) => {
                 if (!val) return;
-                var inputs = document.querySelectorAll('input[name="' + name + '"]');
-                for (var i = 0; i < inputs.length; i++) {
-                    inputs[i].checked = (inputs[i].value === val);
-                }
+                document.querySelectorAll(`input[name="${name}"]`).forEach(el => {
+                    el.checked = (el.value === val);
+                });
             };
 
             setChecked('prop_floor_level', data.floor_level);
             setRadio('prop_room_type', data.room_type);
             setRadio('prop_bathroom_type', data.bathroom_type);
             setChecked('prop_utilities', data.utilities);
-
             if (data.preferences) {
                 setChecked('prop_pref_general', data.preferences.general);
                 setChecked('prop_pref_race', data.preferences.race);
@@ -1739,121 +1724,70 @@
         }
 
         function renderPropertyDetailsView(details) {
-            var container = document.getElementById('panel-room-details-view');
+            const container = document.getElementById('panel-room-details-view');
             if (!container) return;
-            container.innerHTML = '';
+            const data = parsePropertyDetails(details);
+            const emptyFallback = `<div class="detail-view-card" style="background:#f8fafc; border:1px dashed #cbd5e1; text-align:center; padding:16px 14px;">
+                <div style="font-size:22px; margin-bottom:4px;">🛏️</div>
+                <div style="font-weight:700; color:#334155; font-size:13.5px;">Standard Room Rental</div>
+                <div style="font-size:12px; color:#64748b; margin-top:2px;">Contact landlord directly via phone or WhatsApp for specific room amenities & details.</div>
+            </div>`;
 
-            var data = parsePropertyDetails(details);
             if (!data || typeof data !== 'object') {
-                container.innerHTML = '<div class="detail-view-card" style="background:#f8fafc; border:1px dashed #cbd5e1; text-align:center; padding:16px 14px;">' +
-                    '<div style="font-size:22px; margin-bottom:4px;">🛏️</div>' +
-                    '<div style="font-weight:700; color:#334155; font-size:13.5px;">Standard Room Rental</div>' +
-                    '<div style="font-size:12px; color:#64748b; margin-top:2px;">Contact landlord directly via phone or WhatsApp for specific room amenities & details.</div>' +
-                    '</div>';
+                container.innerHTML = emptyFallback;
                 return;
             }
 
-            var html = '';
+            let html = '';
 
-            // 1. Room Specifications (Room Type, Bathroom Type, Floor Level)
-            var hasRoomSpecs = (data.floor_level && data.floor_level.length > 0) || data.room_type || data.bathroom_type;
-            if (hasRoomSpecs) {
-                html += '<div class="detail-view-card">' +
-                    '<div class="detail-view-card-title">🏢 Room Specifications</div>' +
-                    '<div class="detail-badges-grid">';
-                if (data.room_type) {
-                    html += '<span class="detail-badge-pill pill-primary">🛏️ ' + escapeHtml(data.room_type) + ' Room</span>';
-                }
-                if (data.bathroom_type) {
-                    html += '<span class="detail-badge-pill pill-primary">🚿 ' + escapeHtml(data.bathroom_type) + ' Bathroom</span>';
-                }
+            // 1. Room Specifications
+            const hasSpecs = (data.floor_level && data.floor_level.length > 0) || data.room_type || data.bathroom_type;
+            if (hasSpecs) {
+                html += `<div class="detail-view-card"><div class="detail-view-card-title">🏢 Room Specifications</div><div class="detail-badges-grid">`;
+                if (data.room_type) html += `<span class="detail-badge-pill pill-primary">🛏️ ${escapeHtml(data.room_type)} Room</span>`;
+                if (data.bathroom_type) html += `<span class="detail-badge-pill pill-primary">🚿 ${escapeHtml(data.bathroom_type)} Bathroom</span>`;
                 if (data.floor_level && data.floor_level.length > 0) {
-                    var fls = Array.isArray(data.floor_level) ? data.floor_level : [data.floor_level];
-                    for (var f = 0; f < fls.length; f++) {
-                        html += '<span class="detail-badge-pill">🏢 ' + escapeHtml(fls[f]) + ' Floor</span>';
-                    }
+                    const fls = Array.isArray(data.floor_level) ? data.floor_level : [data.floor_level];
+                    fls.forEach(f => html += `<span class="detail-badge-pill">🏢 ${escapeHtml(f)} Floor</span>`);
                 }
-                html += '</div></div>';
+                html += `</div></div>`;
             }
 
-            // 2. Utilities & Amenities Card
+            // 2. Utilities & Amenities
             if (data.utilities && data.utilities.length > 0) {
-                var utilIcons = {
-                    'Air-Conditioning': '❄️',
-                    'Washing Machine': '🧺',
-                    'Wifi / Internet Access': '📶',
-                    'Cooking Allowed': '🍳',
-                    'TV': '📺',
-                    'Share Bathroom': '🚻',
-                    'Private Bathroom': '🚿',
-                    'Shower': '🚿'
-                };
-                html += '<div class="detail-view-card">' +
-                    '<div class="detail-view-card-title">⚡ Utilities & Amenities</div>' +
-                    '<div class="detail-badges-grid">';
-                var utilsList = Array.isArray(data.utilities) ? data.utilities : [data.utilities];
-                for (var i = 0; i < utilsList.length; i++) {
-                    var uName = utilsList[i];
-                    var icon = utilIcons[uName] || '✓';
-                    html += '<span class="detail-badge-pill pill-success">' + icon + ' ' + escapeHtml(uName) + '</span>';
-                }
-                html += '</div></div>';
+                const utilIcons = { 'Air-Conditioning': '❄️', 'Washing Machine': '🧺', 'Wifi / Internet Access': '📶', 'Cooking Allowed': '🍳', 'TV': '📺', 'Share Bathroom': '🚻', 'Private Bathroom': '🚿', 'Shower': '🚿' };
+                html += `<div class="detail-view-card"><div class="detail-view-card-title">⚡ Utilities & Amenities</div><div class="detail-badges-grid">`;
+                const uList = Array.isArray(data.utilities) ? data.utilities : [data.utilities];
+                uList.forEach(u => html += `<span class="detail-badge-pill pill-success">${utilIcons[u] || '✓'} ${escapeHtml(u)}</span>`);
+                html += `</div></div>`;
             }
 
-            // 3. Rental Preferences Card
-            var hasGeneralPref = data.preferences && data.preferences.general && data.preferences.general.length > 0;
-            if (hasGeneralPref) {
-                var prefIcons = {
-                    'Preferred Listing': '⭐',
-                    'Prefer Zero Deposit': '💰',
-                    'Prefer move-in immediately': '🚀',
-                    'Prefer pet allowed': '🐾',
-                    'Prefer muslim friendly': '🕌',
-                    'Prefer smoking allowed': '🚬'
-                };
-                html += '<div class="detail-view-card">' +
-                    '<div class="detail-view-card-title">📋 Rental Preferences</div>' +
-                    '<div class="detail-badges-grid">';
-                var genList = Array.isArray(data.preferences.general) ? data.preferences.general : [data.preferences.general];
-                for (var j = 0; j < genList.length; j++) {
-                    var pName = genList[j];
-                    var pIcon = prefIcons[pName] || '✓';
-                    html += '<span class="detail-badge-pill pill-purple">' + pIcon + ' ' + escapeHtml(pName) + '</span>';
-                }
-                html += '</div></div>';
+            // 3. Rental Preferences
+            if (data.preferences && data.preferences.general && data.preferences.general.length > 0) {
+                const prefIcons = { 'Preferred Listing': '⭐', 'Prefer Zero Deposit': '💰', 'Prefer move-in immediately': '🚀', 'Prefer pet allowed': '🐾', 'Prefer muslim friendly': '🕌', 'Prefer smoking allowed': '🚬' };
+                html += `<div class="detail-view-card"><div class="detail-view-card-title">📋 Rental Preferences</div><div class="detail-badges-grid">`;
+                const gList = Array.isArray(data.preferences.general) ? data.preferences.general : [data.preferences.general];
+                gList.forEach(p => html += `<span class="detail-badge-pill pill-purple">${prefIcons[p] || '✓'} ${escapeHtml(p)}</span>`);
+                html += `</div></div>`;
             }
 
-            // 4. Preferred Tenant Criteria Card (Race & Occupation)
-            var hasRace = data.preferences && data.preferences.race && data.preferences.race.length > 0;
-            var hasOcc = data.preferences && data.preferences.occupation && data.preferences.occupation.length > 0;
+            // 4. Tenant Criteria
+            const hasRace = data.preferences && data.preferences.race && data.preferences.race.length > 0;
+            const hasOcc = data.preferences && data.preferences.occupation && data.preferences.occupation.length > 0;
             if (hasRace || hasOcc) {
-                html += '<div class="detail-view-card">' +
-                    '<div class="detail-view-card-title">👥 Preferred Tenant Criteria</div>' +
-                    '<div class="detail-badges-grid">';
+                html += `<div class="detail-view-card"><div class="detail-view-card-title">👥 Preferred Tenant Criteria</div><div class="detail-badges-grid">`;
                 if (hasRace) {
-                    var raceList = Array.isArray(data.preferences.race) ? data.preferences.race : [data.preferences.race];
-                    for (var r = 0; r < raceList.length; r++) {
-                        html += '<span class="detail-badge-pill">👤 Race: ' + escapeHtml(raceList[r]) + '</span>';
-                    }
+                    const rList = Array.isArray(data.preferences.race) ? data.preferences.race : [data.preferences.race];
+                    rList.forEach(r => html += `<span class="detail-badge-pill">👤 Race: ${escapeHtml(r)}</span>`);
                 }
                 if (hasOcc) {
-                    var occList = Array.isArray(data.preferences.occupation) ? data.preferences.occupation : [data.preferences.occupation];
-                    for (var o = 0; o < occList.length; o++) {
-                        html += '<span class="detail-badge-pill">💼 Occupation: ' + escapeHtml(occList[o]) + '</span>';
-                    }
+                    const oList = Array.isArray(data.preferences.occupation) ? data.preferences.occupation : [data.preferences.occupation];
+                    oList.forEach(o => html += `<span class="detail-badge-pill">💼 Occupation: ${escapeHtml(o)}</span>`);
                 }
-                html += '</div></div>';
+                html += `</div></div>`;
             }
 
-            if (!html) {
-                html = '<div class="detail-view-card" style="background:#f8fafc; border:1px dashed #cbd5e1; text-align:center; padding:16px 14px;">' +
-                    '<div style="font-size:22px; margin-bottom:4px;">🛏️</div>' +
-                    '<div style="font-weight:700; color:#334155; font-size:13.5px;">Standard Room Rental</div>' +
-                    '<div style="font-size:12px; color:#64748b; margin-top:2px;">Contact landlord directly via phone or WhatsApp for specific room amenities & details.</div>' +
-                    '</div>';
-            }
-
-            container.innerHTML = html;
+            container.innerHTML = html || emptyFallback;
         }
 
         function openPropertyPanel(mode, index) {
@@ -2011,236 +1945,132 @@
             if (input) input.value = '';
         }
 
-        function savePropertyFromPanel(event) {
+        async function savePropertyFromPanel(event) {
             event.preventDefault();
 
-            var name = document.getElementById('panel-name').value.trim();
-            var desc = document.getElementById('panel-desc').value.trim();
-            var price = document.getElementById('panel-price').value.trim();
-            var phone = document.getElementById('panel-phone').value.trim();
+            const name = document.getElementById('panel-name').value.trim();
+            const desc = document.getElementById('panel-desc').value.trim();
+            const price = document.getElementById('panel-price').value.trim();
+            const phone = document.getElementById('panel-phone').value.trim();
 
-            if (!name) {
-                alert('Property / Room Name is mandatory and cannot be empty.');
-                document.getElementById('panel-name').focus();
-                return;
-            }
-            if (!desc) {
-                alert('Description is mandatory and cannot be empty.');
-                document.getElementById('panel-desc').focus();
-                return;
-            }
-            if (!price || isNaN(price) || parseFloat(price) <= 0) {
-                alert('Monthly Rent (RM) is mandatory and must be a valid amount greater than 0.');
-                document.getElementById('panel-price').focus();
-                return;
-            }
-            if (!phone) {
-                alert('Contact Phone Number is mandatory and cannot be empty.');
-                document.getElementById('panel-phone').focus();
-                return;
-            }
-            if (!pendingImages || pendingImages.length === 0) {
-                alert('Property Photos are mandatory. Please upload at least 1 photo.');
-                document.getElementById('panel-image-input').click();
-                return;
-            }
+            if (!name) { alert('Property / Room Name is mandatory and cannot be empty.'); document.getElementById('panel-name').focus(); return; }
+            if (!desc) { alert('Description is mandatory and cannot be empty.'); document.getElementById('panel-desc').focus(); return; }
+            if (!price || isNaN(price) || parseFloat(price) <= 0) { alert('Monthly Rent (RM) is mandatory and must be a valid amount greater than 0.'); document.getElementById('panel-price').focus(); return; }
+            if (!phone) { alert('Contact Phone Number is mandatory and cannot be empty.'); document.getElementById('panel-phone').focus(); return; }
+            if (!pendingImages || pendingImages.length === 0) { alert('Property Photos are mandatory. Please upload at least 1 photo.'); document.getElementById('panel-image-input').click(); return; }
 
-            var saveBtn = document.getElementById('panel-save-btn');
-            var originalText = saveBtn.innerText;
+            const saveBtn = document.getElementById('panel-save-btn');
+            const originalText = saveBtn.innerText;
             saveBtn.disabled = true;
             saveBtn.innerText = 'Saving...';
 
-            var newFiles = pendingImages.filter(function(item) { return item.file !== null; });
+            try {
+                // 1. Upload any newly added files
+                const newFiles = pendingImages.filter(item => item.file !== null);
+                let uploadedUrls = [];
+                if (newFiles.length > 0) {
+                    const formData = new FormData();
+                    newFiles.forEach(item => formData.append('images', item.file));
+                    const upRes = await fetch('/api/properties/upload-images', { method: 'POST', body: formData });
+                    const upData = await upRes.json();
+                    if (!upRes.ok) throw new Error(upData.error || 'Failed to upload images.');
+                    uploadedUrls = upData.imageUrls || [];
+                }
 
-            var savePropertyWithFinalUrls = function(finalImageUrls) {
-                var finalImageStr = JSON.stringify(finalImageUrls);
-                var detailsObj = collectPropertyDetailsFromPanel();
-                var detailsStr = JSON.stringify(detailsObj);
+                let upIdx = 0;
+                const finalUrls = pendingImages.map(item => (item.file !== null && uploadedUrls[upIdx]) ? uploadedUrls[upIdx++] : item.url);
+                const finalImageStr = JSON.stringify(finalUrls);
+                const detailsStr = JSON.stringify(collectPropertyDetailsFromPanel());
 
                 if (panelMode === 'create') {
-                    fetch('/api/properties', {
+                    const res = await fetch('/api/properties', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             user_id: currentUser.id,
-                            name: name,
-                            desc: desc,
-                            price: price,
-                            phone: phone,
+                            name, desc, price, phone,
                             lat: pendingLatLng.lat,
                             lng: pendingLatLng.lng,
                             image: finalImageStr,
                             details: detailsStr
                         })
-                    })
-                    .then(function(res) {
-                        return res.json().then(function(d) {
-                            if (!res.ok) {
-                                if (res.status === 401 && d.error && d.error.includes('deleted')) {
-                                    forceLogout(d.error);
-                                }
-                                throw new Error(d.error || 'Failed to create property.');
-                            }
-                            return d;
-                        });
-                    })
-                    .then(function(result) {
-                        // Remove temporary click marker and replace with saved interactive marker
-                        if (pendingMarker) {
-                            map.removeLayer(pendingMarker);
-                            pendingMarker = null;
-                        }
-
-                        var isVerified = result.is_verified !== undefined
-                            ? result.is_verified
-                            : (currentUser && currentUser.role === 'admin' ? 1 : 0);
-
-                        var newMarker = L.marker([pendingLatLng.lat, pendingLatLng.lng]).addTo(map);
-
-                        var propertyData = {
-                            id: result.id,
-                            user_id: currentUser.id,
-                            marker: newMarker,
-                            name: name,
-                            desc: desc,
-                            price: price,
-                            phone: phone,
-                            landlord_name: currentUser.name,
-                            is_verified: isVerified,
-                            lat: pendingLatLng.lat,
-                            lng: pendingLatLng.lng,
-                            image: finalImageStr,
-                            details: detailsStr
-                        };
-                        var index = landlordMarkers.length;
-                        landlordMarkers.push(propertyData);
-                        newMarker.bindPopup(createMarkerPopup(index));
-                        newMarker.on('click', (function(idx) {
-                            return function(e) {
-                                map.panTo(e.latlng, { animate: true });
-                            };
-                        })(index));
-
-                        saveBtn.disabled = false;
-                        saveBtn.innerText = originalText;
-                        closePropertyPanel();
-
-                        if (result.message) {
-                            alert(result.message);
-                        }
-
-                        // Automatically pan to new marker and open its popup square
-                        setTimeout(function() {
-                            map.panTo([propertyData.lat, propertyData.lng], { animate: true });
-                            newMarker.openPopup();
-                        }, 150);
-                    })
-                    .catch(function(err) {
-                        alert('Error creating property: ' + err.message);
-                        saveBtn.disabled = false;
-                        saveBtn.innerText = originalText;
                     });
+                    const result = await res.json();
+                    if (!res.ok) {
+                        if (res.status === 401 && result.error && result.error.includes('deleted')) forceLogout(result.error);
+                        throw new Error(result.error || 'Failed to create property.');
+                    }
+
+                    if (pendingMarker) {
+                        map.removeLayer(pendingMarker);
+                        pendingMarker = null;
+                    }
+
+                    const isVerified = result.is_verified !== undefined ? result.is_verified : (currentUser && currentUser.role === 'admin' ? 1 : 0);
+                    const newMarker = L.marker([pendingLatLng.lat, pendingLatLng.lng]).addTo(map);
+                    const propertyData = {
+                        id: result.id,
+                        user_id: currentUser.id,
+                        marker: newMarker,
+                        name, desc, price, phone,
+                        landlord_name: currentUser.name,
+                        is_verified: isVerified,
+                        lat: pendingLatLng.lat,
+                        lng: pendingLatLng.lng,
+                        image: finalImageStr,
+                        details: detailsStr
+                    };
+                    const index = landlordMarkers.length;
+                    landlordMarkers.push(propertyData);
+                    newMarker.bindPopup(createMarkerPopup(index));
+                    newMarker.on('click', e => map.panTo(e.latlng, { animate: true }));
+
+                    closePropertyPanel();
+                    if (result.message) alert(result.message);
+                    setTimeout(() => {
+                        map.panTo([propertyData.lat, propertyData.lng], { animate: true });
+                        newMarker.openPopup();
+                    }, 150);
+
                 } else if (panelMode === 'edit') {
-                    var targetIndex = editingMarkerIndex;
+                    const targetIndex = editingMarkerIndex;
                     if (targetIndex < 0 || !landlordMarkers[targetIndex]) {
-                        saveBtn.disabled = false;
-                        saveBtn.innerText = originalText;
                         closePropertyPanel();
                         return;
                     }
 
-                    var data = landlordMarkers[targetIndex];
-                    data.name = name;
-                    data.desc = desc;
-                    data.price = price;
-                    data.phone = phone;
-                    data.image = finalImageStr;
-                    data.details = detailsStr;
+                    const data = landlordMarkers[targetIndex];
+                    data.name = name; data.desc = desc; data.price = price; data.phone = phone;
+                    data.image = finalImageStr; data.details = detailsStr;
 
-                    fetch('/api/properties/' + data.id, {
+                    const res = await fetch('/api/properties/' + data.id, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             user_id: currentUser.id,
-                            name: name,
-                            desc: desc,
-                            price: price,
-                            phone: phone,
+                            name, desc, price, phone,
                             image: finalImageStr,
                             details: detailsStr
                         })
-                    })
-                    .then(function(res) {
-                        return res.json().then(function(d) {
-                            if (!res.ok) {
-                                if (res.status === 401 && d.error && d.error.includes('deleted')) {
-                                    forceLogout(d.error);
-                                }
-                                throw new Error(d.error || 'Failed to save property changes.');
-                            }
-                            return d;
-                        });
-                    })
-                    .then(function(result) {
-                        saveBtn.disabled = false;
-                        saveBtn.innerText = originalText;
-
-                        // Rebuild the popup with updated data & images
-                        refreshPopup(targetIndex);
-
-                        // Close edit panel
-                        closePropertyPanel();
-
-                        // Automatically pan to marker and REOPEN THE POPUP CARD SQUARE
-                        if (data && data.marker) {
-                            map.panTo(data.marker.getLatLng(), { animate: true });
-                            setTimeout(function() {
-                                data.marker.openPopup();
-                            }, 150);
-                        }
-                    })
-                    .catch(function(err) {
-                        alert('Error saving property: ' + err.message);
-                        saveBtn.disabled = false;
-                        saveBtn.innerText = originalText;
                     });
+                    const result = await res.json();
+                    if (!res.ok) {
+                        if (res.status === 401 && result.error && result.error.includes('deleted')) forceLogout(result.error);
+                        throw new Error(result.error || 'Failed to save property changes.');
+                    }
+
+                    refreshPopup(targetIndex);
+                    closePropertyPanel();
+                    if (data && data.marker) {
+                        map.panTo(data.marker.getLatLng(), { animate: true });
+                        setTimeout(() => data.marker.openPopup(), 150);
+                    }
                 }
-            };
-
-            if (newFiles.length > 0) {
-                var formData = new FormData();
-                newFiles.forEach(function(item) {
-                    formData.append('images', item.file);
-                });
-                fetch('/api/properties/upload-images', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(function(res) {
-                    return res.json().then(function(d) {
-                        if (!res.ok) throw new Error(d.error || 'Failed to upload images.');
-                        return d;
-                    });
-                })
-                .then(function(uploadResult) {
-                    var uploadedUrls = uploadResult.imageUrls || [];
-                    var uploadedIdx = 0;
-                    var finalUrls = pendingImages.map(function(item) {
-                        if (item.file !== null && uploadedUrls[uploadedIdx]) {
-                            return uploadedUrls[uploadedIdx++];
-                        }
-                        return item.url;
-                    });
-                    savePropertyWithFinalUrls(finalUrls);
-                })
-                .catch(function(err) {
-                    alert('Image upload failed: ' + err.message);
-                    saveBtn.disabled = false;
-                    saveBtn.innerText = originalText;
-                });
-            } else {
-                var finalUrls = pendingImages.map(function(item) { return item.url; });
-                savePropertyWithFinalUrls(finalUrls);
+            } catch (err) {
+                alert('Error saving property: ' + err.message);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerText = originalText;
             }
         }
 
@@ -3421,93 +3251,84 @@
             }, 1000);
         }
 
-        function handleVerifyOtp() {
-            var otpCode = getEnteredOtp();
+        async function handleVerifyOtp() {
+            const otpCode = getEnteredOtp();
             if (otpCode.length !== 6) {
                 alert("Please enter the complete 6-digit verification code.");
-                var digits = document.querySelectorAll('.otp-digit');
-                for (var i = 0; i < digits.length; i++) {
+                const digits = document.querySelectorAll('.otp-digit');
+                for (let i = 0; i < digits.length; i++) {
                     if (!digits[i].value) { digits[i].focus(); break; }
                 }
                 return;
             }
 
-            var verifyBtn = document.getElementById("otp-verify-btn");
-            var originalText = verifyBtn.innerText;
+            const verifyBtn = document.getElementById("otp-verify-btn");
+            const originalText = verifyBtn.innerText;
             verifyBtn.disabled = true;
             verifyBtn.innerText = "Verifying...";
 
-            fetch("/api/verify-otp", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: pendingVerificationEmail, otp: otpCode })
-            })
-                .then(function (res) {
-                    return res.json().then(function (data) {
-                        if (!res.ok) throw new Error(data.error || "Verification failed.");
-                        return data;
-                    });
-                })
-                .then(function (data) {
-                    alert(data.message || "Email verified successfully!");
-                    closeAuthModal();
-                    backToAuthForm();
-
-                    if (data.user) {
-                        currentUser = data.user;
-                        localStorage.setItem('polisewa_user', JSON.stringify(data.user));
-                        updateAuthButton();
-                        loadProperties();
-                    }
-                })
-                .catch(function (err) {
-                    alert("Error: " + err.message);
-                    var digits = document.querySelectorAll('.otp-digit');
-                    digits.forEach(function (d) { d.value = ""; d.classList.remove('filled'); });
-                    digits[0].focus();
-                })
-                .finally(function () {
-                    verifyBtn.disabled = false;
-                    verifyBtn.innerText = originalText;
+            try {
+                const res = await fetch("/api/verify-otp", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: pendingVerificationEmail, otp: otpCode })
                 });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Verification failed.");
+
+                alert(data.message || "Email verified successfully!");
+                closeAuthModal();
+                backToAuthForm();
+
+                if (data.user) {
+                    currentUser = data.user;
+                    localStorage.setItem('polisewa_user', JSON.stringify(data.user));
+                    updateAuthButton();
+                    loadProperties();
+                }
+            } catch (err) {
+                alert("Error: " + err.message);
+                const digits = document.querySelectorAll('.otp-digit');
+                digits.forEach(d => { d.value = ""; d.classList.remove('filled'); });
+                digits[0].focus();
+            } finally {
+                verifyBtn.disabled = false;
+                verifyBtn.innerText = originalText;
+            }
         }
 
-        function handleResendOtp() {
+        async function handleResendOtp() {
             if (!pendingVerificationEmail) return;
-            var resendBtn = document.getElementById("otp-resend-btn");
+            const resendBtn = document.getElementById("otp-resend-btn");
             resendBtn.disabled = true;
             resendBtn.innerText = "Sending...";
 
-            fetch("/api/resend-otp", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: pendingVerificationEmail })
-            })
-                .then(function (res) {
-                    return res.json().then(function (data) {
-                        if (!res.ok) throw new Error(data.error || "Failed to resend code.");
-                        return data;
-                    });
-                })
-                .then(function (data) {
-                    alert(data.message || "New verification code sent!");
-                    var digits = document.querySelectorAll('.otp-digit');
-                    digits.forEach(function (d) { d.value = ""; d.classList.remove('filled'); });
-                    digits[0].focus();
-                    startOtpCooldown(60);
-                })
-                .catch(function (err) {
-                    alert("Error: " + err.message);
-                    resendBtn.disabled = false;
-                    resendBtn.innerText = "Resend Code";
+            try {
+                const res = await fetch("/api/resend-otp", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: pendingVerificationEmail })
                 });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Failed to resend code.");
+
+                alert(data.message || "New verification code sent!");
+                const digits = document.querySelectorAll('.otp-digit');
+                digits.forEach(d => { d.value = ""; d.classList.remove('filled'); });
+                digits[0].focus();
+                startOtpCooldown(60);
+            } catch (err) {
+                alert("Error: " + err.message);
+                resendBtn.disabled = false;
+                resendBtn.innerText = "Resend Code";
+            }
         }
 
-        function handleAuthSubmit(event, type) {
+        async function handleAuthSubmit(event, type) {
             event.preventDefault();
 
-            var payload = {};
-            var url = "";
+            let payload = {};
+            let url = "";
 
             if (type === 'signin') {
                 payload = {
@@ -3527,55 +3348,48 @@
                 url = "/api/signup";
             }
 
-            var submitBtn = event.target.querySelector(".submit-btn");
-            var originalText = submitBtn.innerText;
+            const submitBtn = event.target.querySelector(".submit-btn");
+            const originalText = submitBtn.innerText;
             submitBtn.disabled = true;
             submitBtn.innerText = "Please wait...";
 
-            fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(payload)
-            })
-                .then(function (response) {
-                    return response.json().then(function (data) {
-                        if (!response.ok) {
-                            if (data.needsVerification) {
-                                showOtpForm(data.email || payload.email);
-                                throw new Error(data.error || "Please verify your email address.");
-                            }
-                            throw new Error(data.error || "An error occurred.");
-                        }
-                        return data;
-                    });
-                })
-                .then(function (data) {
-                    if (data.needsVerification) {
-                        alert(data.message || "A 6-digit verification code has been sent to your email.");
-                        showOtpForm(data.email || payload.email);
-                        return;
-                    }
-
-                    alert(data.message);
-                    closeAuthModal();
-                    event.target.reset();
-
-                    if (data.user) {
-                        currentUser = data.user;
-                        localStorage.setItem('polisewa_user', JSON.stringify(data.user));
-                        updateAuthButton();
-                        loadProperties();
-                    }
-                })
-                .catch(function (error) {
-                    alert(error.message);
-                })
-                .finally(function () {
-                    submitBtn.disabled = false;
-                    submitBtn.innerText = originalText;
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
                 });
+                const data = await response.json();
+                if (!response.ok) {
+                    if (data.needsVerification) {
+                        showOtpForm(data.email || payload.email);
+                        throw new Error(data.error || "Please verify your email address.");
+                    }
+                    throw new Error(data.error || "An error occurred.");
+                }
+
+                if (data.needsVerification) {
+                    alert(data.message || "A 6-digit verification code has been sent to your email.");
+                    showOtpForm(data.email || payload.email);
+                    return;
+                }
+
+                alert(data.message);
+                closeAuthModal();
+                event.target.reset();
+
+                if (data.user) {
+                    currentUser = data.user;
+                    localStorage.setItem('polisewa_user', JSON.stringify(data.user));
+                    updateAuthButton();
+                    loadProperties();
+                }
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = originalText;
+            }
         }
 
         // 7. Admin Console Controllers

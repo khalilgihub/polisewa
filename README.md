@@ -2,7 +2,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-v18%2B-green.svg)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-v4.18-blue.svg)](https://expressjs.com/)
-[![Database](https://img.shields.io/badge/Database-Azure%20SQL%20%7C%20SQLite-0078D4.svg)](https://azure.microsoft.com/en-us/products/azure-sql/database)
+[![Database](https://img.shields.io/badge/Database-Azure%20SQL%20Database-0078D4.svg)](https://azure.microsoft.com/en-us/products/azure-sql/database)
 [![Map Engine](https://img.shields.io/badge/Map-Leaflet.js-brightgreen.svg)](https://leafletjs.com/)
 [![Email](https://img.shields.io/badge/Email-Gmail%20SMTP%20%7C%20Nodemailer-EA4335.svg)](https://nodemailer.com/)
 [![Cloudflare](https://img.shields.io/badge/Tunnel-Cloudflare%20Zero%20Trust-F38020.svg)](https://www.cloudflare.com/)
@@ -23,7 +23,7 @@
 - 🔐 **Role-Based Portals**: Dedicated authentication workflows for **Students** and **Landlords** with salted **Bcrypt** password hashing.
 - 🏠 **Full Property CRUD**: Landlords can create listings, adjust rental pricing, edit amenities, and delete properties with automatic image cleanup.
 - 📱 **Responsive Glassmorphism UI**: Modern bottom sheet on mobile devices and expandable sidebar drawer on desktop.
-- ☁️ **Dual Database Architecture**: Seamless compatibility with **Azure SQL Database** (Cloud Production) and **SQLite** (Local Development Fallback).
+- ☁️ **High-Availability Cloud Database**: Enterprise **Azure SQL Database** with connection pooling and automated failover.
 - 🗑️ **Permanent Account Deletion**: Secure account deletion endpoint requiring password confirmation with cascaded removal of all owned properties and uploaded photos.
 
 ---
@@ -35,9 +35,9 @@ polisewa/
 ├── index.html            # Main Single-Page App (Leaflet Map, 6-Box OTP, Search & Auth UI)
 ├── style.css             # Glassmorphism Stylesheet, Responsive Bottom Sheet & Map Controls
 ├── boundary.js           # Kuching District GeoJSON Boundary Polygon
-├── server.js             # Express.js REST API, Nodemailer SMTP & Azure SQL / SQLite Engine
+├── server.js             # Express.js REST API, Nodemailer SMTP & Azure SQL Engine
+├── db.js                 # Azure SQL Connection Pool & Automatic Failover Engine
 ├── uploads/              # Local Storage for Uploaded Property Images
-├── view_db.py            # Python CLI Utility for Database Inspection
 ├── pluscodetocoordinate.py # Utility for Converting Google Plus Codes to Lat/Lng
 ├── get_boundary.py       # Helper Script for Compiling Boundary GeoJSON
 ├── .env                  # Environment Variables (Database & SMTP Credentials)
@@ -140,7 +140,7 @@ EMAIL_USER=polisewa.official@gmail.com
 EMAIL_APP_PASS=your_16_digit_app_password
 ```
 
-> **Note**: If Azure SQL credentials are not provided or connection fails, the server automatically initializes and connects to a local **SQLite** database (`database.sqlite`).
+> **Note**: Database connection automatically manages connection pools and high availability with Primary and Secondary Azure SQL failover support.
 
 ### 5. Start the Application
 
