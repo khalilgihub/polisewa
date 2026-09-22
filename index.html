@@ -403,24 +403,6 @@
                                         <input type="number" id="filter-max-price" min="0" max="1000" step="10" value="1000" placeholder="1000.00" oninput="onPriceNumberInput()" />
                                     </div>
                                 </div>
-                            </div>
-
-                            <!-- Interactive Dual Range Slider (0 to 1000) -->
-                            <div class="dual-slider-container">
-                                <div class="dual-slider-wrapper">
-                                    <div class="slider-track"></div>
-                                    <div class="slider-range" id="slider-range-fill"></div>
-                                    <input type="range" id="filter-min-range" min="0" max="1000" step="10" value="0" oninput="onPriceSliderInput('min')" aria-label="Minimum rent slider" />
-                                    <input type="range" id="filter-max-range" min="0" max="1000" step="10" value="1000" oninput="onPriceSliderInput('max')" aria-label="Maximum rent slider" />
-                                </div>
-                                <div class="price-slider-ticks">
-                                    <span>RM 0.00</span>
-                                    <span>RM 250</span>
-                                    <span>RM 500</span>
-                                    <span>RM 750</span>
-                                    <span>RM 1,000.00</span>
-                                </div>
-                            </div>
                         </div>
 
                         <!-- 2. Room Type -->
@@ -975,7 +957,7 @@
 
         // Quick Jump to PKS Campus Button
         document.getElementById('btn-jump-pks').onclick = function() {
-            map.flyTo(polytechnicLatLng, 16, { animate: true, duration: 1.0 });
+            map.setView(polytechnicLatLng, 16);
             polytechMarker.openPopup();
         };
 
@@ -2173,52 +2155,13 @@
             }
         }
 
-        function updateSliderRangeVisual() {
-            var minRange = document.getElementById('filter-min-range');
-            var maxRange = document.getElementById('filter-max-range');
-            var rangeFill = document.getElementById('slider-range-fill');
-            if (!minRange || !maxRange || !rangeFill) return;
-
-            var minVal = parseFloat(minRange.value) || 0;
-            var maxVal = parseFloat(maxRange.value) || 1000;
-            var minPercent = Math.max(0, Math.min(100, (minVal / 1000) * 100));
-            var maxPercent = Math.max(0, Math.min(100, (maxVal / 1000) * 100));
-
-            rangeFill.style.left = minPercent + '%';
-            rangeFill.style.width = (maxPercent - minPercent) + '%';
-        }
-
-        function onPriceSliderInput(type) {
-            var minRange = document.getElementById('filter-min-range');
-            var maxRange = document.getElementById('filter-max-range');
-            var minNum = document.getElementById('filter-min-price');
-            var maxNum = document.getElementById('filter-max-price');
-            if (!minRange || !maxRange || !minNum || !maxNum) return;
-
-            var minVal = parseFloat(minRange.value) || 0;
-            var maxVal = parseFloat(maxRange.value) || 1000;
-
-            if (type === 'min' && minVal > maxVal) {
-                minRange.value = maxVal;
-                minVal = maxVal;
-            } else if (type === 'max' && maxVal < minVal) {
-                maxRange.value = minVal;
-                maxVal = minVal;
-            }
-
-            minNum.value = minVal;
-            maxNum.value = maxVal;
-            updateSliderRangeVisual();
-            updatePriceDisplayPill(minVal, maxVal);
-            onFilterCriteriaChanged();
-        }
+        function updateSliderRangeVisual() {}
+        function onPriceSliderInput(type) {}
 
         function onPriceNumberInput() {
-            var minRange = document.getElementById('filter-min-range');
-            var maxRange = document.getElementById('filter-max-range');
             var minNum = document.getElementById('filter-min-price');
             var maxNum = document.getElementById('filter-max-price');
-            if (!minRange || !maxRange || !minNum || !maxNum) return;
+            if (!minNum || !maxNum) return;
 
             var minVal = parseFloat(minNum.value);
             var maxVal = parseFloat(maxNum.value);
@@ -2226,12 +2169,6 @@
             if (isNaN(minVal)) minVal = 0;
             if (isNaN(maxVal)) maxVal = 1000;
 
-            minVal = Math.max(0, Math.min(1000, minVal));
-            maxVal = Math.max(0, Math.min(1000, maxVal));
-
-            minRange.value = minVal;
-            maxRange.value = maxVal;
-            updateSliderRangeVisual();
             updatePriceDisplayPill(minVal, maxVal);
             onFilterCriteriaChanged();
         }
@@ -2246,12 +2183,9 @@
 
         function setQuickPrice(val) {
             var maxNum = document.getElementById('filter-max-price');
-            var maxRange = document.getElementById('filter-max-range');
             if (maxNum) {
                 var parsed = (val !== '' && val !== null && !isNaN(val)) ? parseFloat(val) : 1000;
                 maxNum.value = parsed;
-                if (maxRange) maxRange.value = parsed;
-                updateSliderRangeVisual();
                 var minNum = document.getElementById('filter-min-price');
                 var minVal = minNum ? (parseFloat(minNum.value) || 0) : 0;
                 updatePriceDisplayPill(minVal, parsed);
@@ -2294,18 +2228,13 @@
         function syncFilterFormWithActive() {
             var minNum = document.getElementById('filter-min-price');
             var maxNum = document.getElementById('filter-max-price');
-            var minRange = document.getElementById('filter-min-range');
-            var maxRange = document.getElementById('filter-max-range');
 
             var minVal = (activeFilters.minPrice !== null && activeFilters.minPrice !== undefined) ? activeFilters.minPrice : 0;
             var maxVal = (activeFilters.maxPrice !== null && activeFilters.maxPrice !== undefined) ? activeFilters.maxPrice : 1000;
 
             if (minNum) minNum.value = minVal;
             if (maxNum) maxNum.value = maxVal;
-            if (minRange) minRange.value = minVal;
-            if (maxRange) maxRange.value = maxVal;
 
-            updateSliderRangeVisual();
             updatePriceDisplayPill(minVal, maxVal);
 
             var setChecked = function(name, list) {
