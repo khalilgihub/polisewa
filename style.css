@@ -3448,58 +3448,176 @@ textarea {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
-.price-input-prefix {
-    font-size: 13.5px;
+/* Modern Lucide Icons Global Standard */
+i[data-lucide],
+.lucide {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15em;
+    height: 1.15em;
+    stroke-width: 2.2;
+    vertical-align: -0.15em;
+    stroke: currentColor;
+    fill: none;
+    flex-shrink: 0;
+}
+
+.verified-seal-icon.lucide,
+i[data-lucide="badge-check"].verified-seal-icon {
+    width: 17px;
+    height: 17px;
+    color: #10b981;
+    stroke: #10b981;
+    fill: rgba(16, 185, 129, 0.15);
+}
+
+/* Monthly Rent Min-Max Inputs & Dual Range Slider */
+.price-range-inputs-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.price-range-col {
+    flex: 1;
+}
+
+.price-range-col label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.price-range-box {
+    display: flex;
+    align-items: center;
+    background: #f8fafc;
+    border: 1.5px solid #dbe3ee;
+    border-radius: 10px;
+    padding: 7px 11px;
+    transition: all 0.2s ease;
+}
+
+.price-range-box:focus-within {
+    border-color: var(--primary);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.price-range-box .prefix {
+    font-size: 13px;
     font-weight: 800;
     color: #64748b;
-    margin-right: 8px;
+    margin-right: 6px;
     user-select: none;
 }
 
-#filter-max-price {
-    flex: 1;
+.price-range-box input {
+    width: 100%;
     border: none;
     background: transparent;
     font-size: 14px;
     font-weight: 600;
     color: #0f172a;
     outline: none;
-    padding: 9px 0;
+    padding: 0;
 }
 
-.filter-quick-chips,
-.quick-price-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 2px;
-}
-
-.quick-chip,
-.quick-price-chip {
-    background: #f1f5f9;
-    border: 1px solid #e2e8f0;
-    border-radius: 9999px;
-    padding: 4px 11px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #475569;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.quick-chip:hover,
-.quick-price-chip:hover {
-    background: #e2e8f0;
-    color: #0f172a;
-}
-
-.quick-chip.active,
-.quick-price-chip.active {
-    background: #eff6ff;
-    border-color: #3b82f6;
-    color: #2563eb;
+.price-range-separator {
+    color: #94a3b8;
     font-weight: 700;
+    font-size: 16px;
+    margin-top: 18px;
+}
+
+/* Dual Range Slider */
+.dual-slider-container {
+    padding: 4px 2px 2px;
+}
+
+.dual-slider-wrapper {
+    position: relative;
+    height: 28px;
+    display: flex;
+    align-items: center;
+}
+
+.slider-track {
+    position: absolute;
+    width: 100%;
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    z-index: 1;
+}
+
+.slider-range {
+    position: absolute;
+    height: 6px;
+    background: var(--primary);
+    border-radius: 999px;
+    z-index: 2;
+    left: 0%;
+    width: 100%;
+    transition: left 0.04s ease, width 0.04s ease;
+}
+
+.dual-slider-wrapper input[type="range"] {
+    position: absolute;
+    width: 100%;
+    height: 6px;
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    pointer-events: none;
+    z-index: 3;
+    margin: 0;
+    outline: none;
+}
+
+.dual-slider-wrapper input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2.5px solid var(--primary);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+    cursor: pointer;
+    pointer-events: auto;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dual-slider-wrapper input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 3px 9px rgba(37, 99, 235, 0.45);
+}
+
+.dual-slider-wrapper input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2.5px solid var(--primary);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.price-slider-ticks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-top: 4px;
 }
 
 .filter-chips-grid {
