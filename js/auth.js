@@ -33,6 +33,28 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
+// Safe API response parser (prevents HTML non-JSON crash)
+function parseApiResponse(res, defaultError) {
+    return res.text().then(function (text) {
+        var data = null;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            var err = new Error('Server error (' + res.status + '). Please try again later.');
+            err.status = res.status;
+            throw err;
+        }
+        if (!res.ok) {
+            var errorMsg = (data && data.error) ? data.error : (defaultError || 'Request failed');
+            var apiErr = new Error(errorMsg);
+            apiErr.data = data;
+            apiErr.status = res.status;
+            throw apiErr;
+        }
+        return data;
+    });
+}
+
 // 1. Force Logout Handler
 function forceLogout(reason) {
     if (!currentUser && !localStorage.getItem('polisewa_user')) return;
@@ -197,12 +219,14 @@ function handleAuthSubmit(event, type) {
         var email = document.getElementById('signin-email').value.trim();
         var password = document.getElementById('signin-password').value;
 
-        fetch('/api/auth/login', {
+        fetch('/api/signin', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: email, password: password })
         })
-            .then(function (res) { return res.json().then(function (d) { if (!res.ok) throw new Error(d.error || 'Login failed'); return d; }); })
+            .then(function (res) {
+                return parseApiResponse(res, 'Login failed');
+            })
             .then(function (data) {
                 currentUser = data.user;
                 localStorage.setItem('polisewa_user', JSON.stringify(currentUser));
@@ -212,6 +236,9 @@ function handleAuthSubmit(event, type) {
                 alert('Welcome back, ' + currentUser.name + '!');
             })
             .catch(function (err) {
+                if (err.status === 403 && err.data && err.data.needsVerification) {
+                    showOtpSection(err.data.email || email);
+                }
                 alert(err.message);
             })
             .finally(function () {
@@ -225,14 +252,16 @@ function handleAuthSubmit(event, type) {
         var pass = document.getElementById('signup-password').value;
         var phone = document.getElementById('signup-phone').value.trim();
 
-        fetch('/api/auth/register', {
+        fetch('/api/signup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: name, email: emailVal, password: pass, role: activeRole, phone: phone })
         })
-            .then(function (res) { return res.json().then(function (d) { if (!res.ok) throw new Error(d.error || 'Registration failed'); return d; }); })
+            .then(function (res) {
+                return parseApiResponse(res, 'Registration failed');
+            })
             .then(function (data) {
-                if (data.requiresOtp) {
+                if (data.needsVerification || data.requiresOtp) {
                     showOtpSection(data.email || emailVal);
                 } else {
                     currentUser = data.user;
@@ -318,12 +347,14 @@ function handleVerifyOtp() {
     verifyBtn.disabled = true;
     verifyBtn.innerText = 'Verifying...';
 
-    fetch('/api/auth/verify-otp', {
+    fetch('/api/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email, otp: otpCode })
     })
-        .then(function (res) { return res.json().then(function (d) { if (!res.ok) throw new Error(d.error || 'Verification failed'); return d; }); })
+        .then(function (res) {
+            return parseApiResponse(res, 'Verification failed');
+        })
         .then(function (data) {
             currentUser = data.user;
             localStorage.setItem('polisewa_user', JSON.stringify(currentUser));
@@ -346,14 +377,16 @@ function handleResendOtp() {
     var resendBtn = document.getElementById('otp-resend-btn');
     if (resendBtn) resendBtn.disabled = true;
 
-    fetch('/api/auth/resend-otp', {
+    fetch('/api/resend-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email })
     })
-        .then(function (res) { return res.json().then(function (d) { if (!res.ok) throw new Error(d.error || 'Failed to resend code'); return d; }); })
-        .then(function () {
-            alert('A new verification code has been sent to ' + email + '.');
+        .then(function (res) {
+            return parseApiResponse(res, 'Failed to resend code');
+        })
+        .then(function (data) {
+            alert(data.message || ('A new verification code has been sent to ' + email + '.'));
             startOtpTimer(60);
         })
         .catch(function (err) {
@@ -421,12 +454,14 @@ function handleDeleteAccount() {
     delBtn.disabled = true;
     delBtn.innerText = 'Deleting...';
 
-    fetch('/api/auth/delete-account', {
+    fetch('/api/user', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: currentUser.id, password: password })
     })
-        .then(function (res) { return res.json().then(function (d) { if (!res.ok) throw new Error(d.error || 'Failed to delete account'); return d; }); })
+        .then(function (res) {
+            return parseApiResponse(res, 'Failed to delete account');
+        })
         .then(function () {
             alert('Your account and all associated properties have been permanently deleted.');
             closeDeleteAccountModal();

@@ -511,7 +511,7 @@ app.post('/api/properties/upload-images', upload.array('images', 10), (req, res)
 });
 
 // SIGN UP Endpoint (Generates OTP & sends verification email)
-app.post('/api/signup', async (req, res) => {
+app.post(['/api/signup', '/api/auth/register'], async (req, res) => {
     const { name, email, phone, password, role, extra } = req.body;
     if (!name || !email || !phone || !password || !role) {
         return res.status(400).json({ error: 'All primary fields (name, email, phone, password, role) are required.' });
@@ -613,7 +613,7 @@ app.post('/api/signup', async (req, res) => {
 });
 
 // VERIFY OTP Endpoint
-app.post('/api/verify-otp', async (req, res) => {
+app.post(['/api/verify-otp', '/api/auth/verify-otp'], async (req, res) => {
     const { email, otp } = req.body;
     if (!email || !otp) {
         return res.status(400).json({ error: 'Email and 6-digit verification code are required.' });
@@ -687,7 +687,7 @@ app.post('/api/verify-otp', async (req, res) => {
 });
 
 // RESEND OTP Endpoint
-app.post('/api/resend-otp', async (req, res) => {
+app.post(['/api/resend-otp', '/api/auth/resend-otp'], async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required.' });
 
@@ -749,7 +749,7 @@ app.post('/api/resend-otp', async (req, res) => {
 });
 
 // SIGN IN Endpoint (Checks verification)
-app.post('/api/signin', async (req, res) => {
+app.post(['/api/signin', '/api/auth/login'], async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required.' });
@@ -1567,7 +1567,7 @@ app.patch('/api/admin/users/:id/verify', async (req, res) => {
 });
 
 // DELETE USER ACCOUNT (Self)
-app.delete('/api/user', async (req, res) => {
+app.delete(['/api/user', '/api/auth/delete-account'], async (req, res) => {
     const { user_id, password } = req.body;
     if (!user_id || !password) return res.status(400).json({ error: 'user_id and password are required.' });
 
