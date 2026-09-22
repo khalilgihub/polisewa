@@ -151,16 +151,40 @@ function setRole(role) {
         }
     });
 
-    var phoneGroup = document.getElementById('phone-input-group');
-    var signupPhone = document.getElementById('signup-phone');
-    if (phoneGroup && signupPhone) {
+    var subTitle = document.getElementById('auth-modal-sub');
+    if (subTitle) {
+        subTitle.innerText = (role === 'landlord') 
+            ? 'List and manage your rental properties near Politeknik'
+            : 'Find verified room rentals near Politeknik Kuching';
+    }
+
+    var phoneLabel = document.getElementById('signup-phone-label');
+    if (phoneLabel) {
+        phoneLabel.innerText = (role === 'landlord')
+            ? 'WhatsApp Phone Number (For Inquiries)'
+            : 'Phone Number (Contact)';
+    }
+
+    var extraLabel = document.getElementById('extra-field-label');
+    var extraInput = document.getElementById('signup-extra');
+    if (extraLabel && extraInput) {
         if (role === 'landlord') {
-            phoneGroup.style.display = 'block';
-            signupPhone.required = true;
+            extraLabel.innerText = 'Landlord Info / Organization (Optional)';
+            extraInput.placeholder = 'e.g. Property Owner / Agent';
         } else {
-            phoneGroup.style.display = 'none';
-            signupPhone.required = false;
+            extraLabel.innerText = 'University / Institution';
+            extraInput.placeholder = 'Politeknik Kuching Sarawak';
         }
+    }
+
+    var signinBtn = document.getElementById('signin-submit-btn');
+    if (signinBtn) {
+        signinBtn.innerText = 'Sign In as ' + (role === 'landlord' ? 'Landlord' : 'Student');
+    }
+
+    var signupBtn = document.getElementById('signup-submit-btn');
+    if (signupBtn) {
+        signupBtn.innerText = 'Create ' + (role === 'landlord' ? 'Landlord' : 'Student') + ' Account';
     }
 }
 
@@ -176,9 +200,11 @@ function setFormType(type) {
 
     var signinForm = document.getElementById('signin-form');
     var signupForm = document.getElementById('signup-form');
-    var otpSection = document.getElementById('otp-verification-section');
+    var otpSection = document.getElementById('otp-form');
+    var normalAuthForms = document.getElementById('normal-auth-forms');
 
     if (otpSection) otpSection.style.display = 'none';
+    if (normalAuthForms) normalAuthForms.style.display = 'block';
 
     if (type === 'signin') {
         if (signinForm) signinForm.classList.add('active');
@@ -192,6 +218,11 @@ function setFormType(type) {
 function openAuthModal() {
     if (authDropdown) authDropdown.classList.remove('active');
     if (authModalOverlay) authModalOverlay.classList.add('active');
+    var otpSection = document.getElementById('otp-form');
+    var normalAuthForms = document.getElementById('normal-auth-forms');
+    if (otpSection) otpSection.style.display = 'none';
+    if (normalAuthForms) normalAuthForms.style.display = 'block';
+    setRole(activeRole);
     setFormType('signin');
 }
 
@@ -200,7 +231,7 @@ function closeAuthModal() {
 }
 
 function backToAuthForm() {
-    var otpSection = document.getElementById('otp-verification-section');
+    var otpSection = document.getElementById('otp-form');
     var normalAuthForms = document.getElementById('normal-auth-forms');
     if (otpSection) otpSection.style.display = 'none';
     if (normalAuthForms) normalAuthForms.style.display = 'block';
@@ -222,7 +253,7 @@ function handleAuthSubmit(event, type) {
         fetch('/api/signin', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: email, password: password })
+            body: JSON.stringify({ email: email, password: password, role: activeRole })
         })
             .then(function (res) {
                 return parseApiResponse(res, 'Login failed');
@@ -251,11 +282,12 @@ function handleAuthSubmit(event, type) {
         var emailVal = document.getElementById('signup-email').value.trim();
         var pass = document.getElementById('signup-password').value;
         var phone = document.getElementById('signup-phone').value.trim();
+        var extra = document.getElementById('signup-extra') ? document.getElementById('signup-extra').value.trim() : '';
 
         fetch('/api/signup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name, email: emailVal, password: pass, role: activeRole, phone: phone })
+            body: JSON.stringify({ name: name, email: emailVal, password: pass, role: activeRole, phone: phone, extra: extra })
         })
             .then(function (res) {
                 return parseApiResponse(res, 'Registration failed');
@@ -284,11 +316,11 @@ function handleAuthSubmit(event, type) {
 
 function showOtpSection(email) {
     var normalAuthForms = document.getElementById('normal-auth-forms');
-    var otpSection = document.getElementById('otp-verification-section');
+    var otpSection = document.getElementById('otp-form');
     var targetEmailSpan = document.getElementById('otp-target-email');
 
     if (normalAuthForms) normalAuthForms.style.display = 'none';
-    if (otpSection) otpSection.style.display = 'block';
+    if (otpSection) otpSection.style.display = 'flex';
     if (targetEmailSpan) targetEmailSpan.innerText = email;
 
     // Reset OTP boxes

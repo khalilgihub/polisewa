@@ -143,62 +143,65 @@
                     </svg>
                 </button>
 
-                <!-- Header -->
-                <div class="modal-header">
-                    <h2>Welcome to Polisewa</h2>
-                    <p>Find room rentals or list your property near Politeknik</p>
+                <!-- Normal Auth Screens (Sign In & Sign Up) -->
+                <div id="normal-auth-forms">
+                    <!-- Header -->
+                    <div class="modal-header">
+                        <h2>Welcome to Polisewa</h2>
+                        <p id="auth-modal-sub">Find room rentals or list your property near Politeknik</p>
+                    </div>
+
+                    <!-- Role Selector Tabs -->
+                    <div class="role-selector">
+                        <button type="button" class="role-tab active" onclick="setRole('student')">🎓 Student</button>
+                        <button type="button" class="role-tab" onclick="setRole('landlord')">🔑 Landlord</button>
+                    </div>
+
+                    <!-- Form Type Toggle (Sign In / Sign Up) -->
+                    <div class="form-toggle">
+                        <button type="button" class="toggle-tab active" onclick="setFormType('signin')">Sign In</button>
+                        <button type="button" class="toggle-tab" onclick="setFormType('signup')">Sign Up</button>
+                    </div>
+
+                    <!-- Sign In Form -->
+                    <form id="signin-form" class="auth-form active" onsubmit="handleAuthSubmit(event, 'signin')">
+                        <div class="input-group">
+                            <label for="signin-email">Email Address</label>
+                            <input type="email" id="signin-email" required autocomplete="email" placeholder="name@example.com" />
+                        </div>
+                        <div class="input-group">
+                            <label for="signin-password">Password</label>
+                            <input type="password" id="signin-password" required placeholder="••••••••" autocomplete="current-password" />
+                        </div>
+                        <button type="submit" class="submit-btn" id="signin-submit-btn">Sign In as Student</button>
+                    </form>
+
+                    <!-- Sign Up Form -->
+                    <form id="signup-form" class="auth-form" onsubmit="handleAuthSubmit(event, 'signup')">
+                        <div class="input-group">
+                            <label for="signup-name">Full Name</label>
+                            <input type="text" id="signup-name" required placeholder="e.g. Ahmad Albab" autocomplete="name" />
+                        </div>
+                        <div class="input-group">
+                            <label for="signup-email">Email Address</label>
+                            <input type="email" id="signup-email" required autocomplete="email" placeholder="name@example.com" />
+                        </div>
+                        <div class="input-group" id="signup-phone-group">
+                            <label for="signup-phone" id="signup-phone-label">WhatsApp Phone Number</label>
+                            <input type="tel" id="signup-phone" required placeholder="+60123456789" inputmode="tel" autocomplete="tel" pattern="[0-9+]+" oninput="this.value = this.value.replace(/[^0-9+]/g, '')" />
+                        </div>
+                        <div class="input-group">
+                            <label for="signup-password">Password</label>
+                            <input type="password" id="signup-password" required placeholder="•••••••• (Min. 6 characters)" autocomplete="new-password" minlength="6" />
+                        </div>
+                        <!-- Extra field for Student / Landlord details dynamically adjusted -->
+                        <div class="input-group" id="extra-field-group">
+                            <label id="extra-field-label" for="signup-extra">University / Institution</label>
+                            <input type="text" id="signup-extra" placeholder="Politeknik Kuching Sarawak" />
+                        </div>
+                        <button type="submit" class="submit-btn" id="signup-submit-btn">Create Student Account</button>
+                    </form>
                 </div>
-
-                <!-- Role Selector Tabs -->
-                <div class="role-selector">
-                    <button class="role-tab active" onclick="setRole('student')">🎓 Student</button>
-                    <button class="role-tab" onclick="setRole('landlord')">🔑 Landlord</button>
-                </div>
-
-                <!-- Form Type Toggle (Sign In / Sign Up) -->
-                <div class="form-toggle">
-                    <button class="toggle-tab active" onclick="setFormType('signin')">Sign In</button>
-                    <button class="toggle-tab" onclick="setFormType('signup')">Sign Up</button>
-                </div>
-
-                <!-- Sign In Form -->
-                <form id="signin-form" class="auth-form active" onsubmit="handleAuthSubmit(event, 'signin')">
-                    <div class="input-group">
-                        <label for="signin-email">Email Address</label>
-                        <input type="email" id="signin-email" required autocomplete="email" />
-                    </div>
-                    <div class="input-group">
-                        <label for="signin-password">Password</label>
-                        <input type="password" id="signin-password" required placeholder="••••••••" autocomplete="current-password" />
-                    </div>
-                    <button type="submit" class="submit-btn">Sign In</button>
-                </form>
-
-                <!-- Sign Up Form -->
-                <form id="signup-form" class="auth-form" onsubmit="handleAuthSubmit(event, 'signup')">
-                    <div class="input-group">
-                        <label for="signup-name">Full Name</label>
-                        <input type="text" id="signup-name" required placeholder="John Doe" autocomplete="name" />
-                    </div>
-                    <div class="input-group">
-                        <label for="signup-email">Email Address</label>
-                        <input type="email" id="signup-email" required autocomplete="email" />
-                    </div>
-                    <div class="input-group">
-                        <label for="signup-phone">Phone Number</label>
-                        <input type="tel" id="signup-phone" required placeholder="+60123456789" inputmode="tel" autocomplete="tel" pattern="[0-9+]+" oninput="this.value = this.value.replace(/[^0-9+]/g, '')" />
-                    </div>
-                    <div class="input-group">
-                        <label for="signup-password">Password</label>
-                        <input type="password" id="signup-password" required placeholder="••••••••" autocomplete="new-password" />
-                    </div>
-                    <!-- Extra field for Student / Landlord details dynamically adjusted -->
-                    <div class="input-group" id="extra-field-group">
-                        <label id="extra-field-label" for="signup-extra">University / Institution</label>
-                        <input type="text" id="signup-extra" placeholder="Politeknik Kuching Sarawak" />
-                    </div>
-                    <button type="submit" class="submit-btn">Create Account</button>
-                </form>
 
                 <!-- OTP Verification Form Screen (6-Digit Grid) -->
                 <div id="otp-form" class="auth-form" style="display:none;">

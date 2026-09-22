@@ -748,9 +748,9 @@ app.post(['/api/resend-otp', '/api/auth/resend-otp'], async (req, res) => {
     }
 });
 
-// SIGN IN Endpoint (Checks verification)
+// SIGN IN Endpoint (Checks verification & role)
 app.post(['/api/signin', '/api/auth/login'], async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
     if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required.' });
     }
@@ -848,6 +848,15 @@ app.post(['/api/signin', '/api/auth/login'], async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(401).json({ error: 'Invalid email address or password.' });
+        }
+
+        // Validate role section (student vs landlord)
+        if (user.role !== 'admin' && role && user.role !== role) {
+            const registeredRoleName = (user.role === 'landlord') ? 'Landlord' : 'Student';
+            const requestedRoleName = (role === 'landlord') ? 'Landlord' : 'Student';
+            return res.status(403).json({
+                error: `This account is registered as a ${registeredRoleName}, not a ${requestedRoleName}. Please switch to the ${registeredRoleName} section to sign in.`
+            });
         }
 
         // If user account is not verified, trigger OTP send and ask to verify
