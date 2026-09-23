@@ -34,12 +34,10 @@
 polisewa/
 ├── index.html            # Main Single-Page App (Leaflet Map, 6-Box OTP, Search & Auth UI)
 ├── style.css             # Glassmorphism Stylesheet, Responsive Bottom Sheet & Map Controls
-├── boundary.js           # Kuching District GeoJSON Boundary Polygon
 ├── server.js             # Express.js REST API, Nodemailer SMTP & Azure SQL Engine
 ├── db.js                 # Azure SQL Connection Pool & Automatic Failover Engine
 ├── uploads/              # Local Storage for Uploaded Property Images
 ├── pluscodetocoordinate.py # Utility for Converting Google Plus Codes to Lat/Lng
-├── get_boundary.py       # Helper Script for Compiling Boundary GeoJSON
 ├── .env                  # Environment Variables (Database & SMTP Credentials)
 ├── .gitignore            # Git Ignored Secrets & Build Files
 └── package.json          # Node.js Dependencies & NPM Scripts

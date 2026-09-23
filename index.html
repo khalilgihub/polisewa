@@ -27,8 +27,6 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Boundary GeoJSON Data -->
-    <script src="boundary.js"></script>
 
     <!-- Custom Stylesheet -->
     <link rel="stylesheet" href="style.css?v=20260922_filter" />
@@ -838,7 +836,7 @@
             L.latLng(1.85, 110.70)
         );
 
-        // 1. Initialize Leaflet Map centered on Kuching with strict boundary enforcement
+        // 1. Initialize Leaflet Map centered on Kuching / PKS Campus
         var map = L.map('map', {
             zoomControl: false,
             attributionControl: false,
@@ -882,75 +880,7 @@
             document.body.classList.remove('dark-mode');
         } catch(e) {}
 
-        // 3. Draw the Kuching boundary from boundary.js
-        if (typeof kuchingBoundary !== 'undefined') {
-            L.geoJSON(kuchingBoundary, {
-                style: {
-                    color: '#ff6600',    // Orange color
-                    dashArray: '8, 8',   // Dotted line style
-                    weight: 3.5,
-                    fillOpacity: 0       // Transparent fill (outline only)
-                },
-                interactive: false       // Let clicks pass through to the map
-            }).addTo(map);
-        } else {
-            console.error("kuchingBoundary variable is not defined.");
-        }
-
-        // Stitch multi-segment boundary lines into closed polygon rings
-        var kuchingPolygonRings = [];
-        if (typeof kuchingBoundary !== 'undefined' && kuchingBoundary.geometry && kuchingBoundary.geometry.coordinates) {
-            var segments = JSON.parse(JSON.stringify(kuchingBoundary.geometry.coordinates));
-            function ptEq(p1, p2) { return Math.abs(p1[0]-p2[0]) < 1e-6 && Math.abs(p1[1]-p2[1]) < 1e-6; }
-            while (segments.length > 0) {
-                var currentRing = segments.shift();
-                var grew = true;
-                while (grew) {
-                    grew = false;
-                    var start = currentRing[0];
-                    var end = currentRing[currentRing.length - 1];
-                    for (var i = 0; i < segments.length; i++) {
-                        var seg = segments[i];
-                        if (ptEq(end, seg[0])) {
-                            currentRing.push.apply(currentRing, seg.slice(1));
-                            segments.splice(i, 1);
-                            grew = true; break;
-                        } else if (ptEq(end, seg[seg.length - 1])) {
-                            currentRing.push.apply(currentRing, seg.slice(0, -1).reverse());
-                            segments.splice(i, 1);
-                            grew = true; break;
-                        } else if (ptEq(start, seg[seg.length - 1])) {
-                            currentRing.unshift.apply(currentRing, seg.slice(0, -1));
-                            segments.splice(i, 1);
-                            grew = true; break;
-                        } else if (ptEq(start, seg[0])) {
-                            currentRing.unshift.apply(currentRing, seg.slice(1).reverse());
-                            segments.splice(i, 1);
-                            grew = true; break;
-                        }
-                    }
-                }
-                kuchingPolygonRings.push(currentRing);
-            }
-        }
-
-        // Ray-casting point-in-polygon check against the exact orange Kuching boundary line
-        function isInsideKuchingBoundary(lat, lng) {
-            if (!kuchingMaxBounds.contains([lat, lng])) return false;
-            if (kuchingPolygonRings.length === 0) return true;
-
-            var isInside = false;
-            for (var r = 0; r < kuchingPolygonRings.length; r++) {
-                var ring = kuchingPolygonRings[r];
-                for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-                    var xi = ring[i][0], yi = ring[i][1];
-                    var xj = ring[j][0], yj = ring[j][1];
-                    var intersect = ((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
-                    if (intersect) isInside = !isInside;
-                }
-            }
-            return isInside;
-        }
+        // 3. Map boundary polygon removed
 
         // 4. Special Pinpoint: Politeknik Kuching Sarawak (Normal Marker with graduation cap icon)
         var polytechnicLatLng = [1.630688, 110.193062];
@@ -2062,10 +1992,7 @@
         // Landlord click on map to drop pin and open panel
         map.on('click', function(e) {
             if (currentUser && currentUser.role === 'landlord') {
-                if (!isInsideKuchingBoundary(e.latlng.lat, e.latlng.lng)) {
-                    alert("Please select a location inside the orange Kuching boundary line.");
-                    return;
-                }
+
                 var myCount = 0;
                 for (var i = 0; i < landlordMarkers.length; i++) {
                     if (landlordMarkers[i].user_id === currentUser.id) {
@@ -2694,11 +2621,7 @@
                     var currentInput = document.getElementById("search-input");
                     if (currentInput && currentInput.value.trim().toLowerCase() !== qLower) return;
 
-                    var localPlaces = (data || []).filter(function (item) {
-                        var lat = parseFloat(item.lat);
-                        var lon = parseFloat(item.lon);
-                        return isInsideKuchingBoundary(lat, lon);
-                    });
+                    var localPlaces = data || [];
 
                     renderSearchResults(query, matchedProperties, localPlaces);
                 })
